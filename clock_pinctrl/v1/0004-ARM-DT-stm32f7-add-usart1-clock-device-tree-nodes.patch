@@ -1,0 +1,83 @@
+From 8bd6d5713f4bd431d9a921fd414575e9c23e1a68 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 26 Jan 2017 17:55:29 -0800
+Subject: [PATCH 04/10] ARM: DT: stm32f7: add usart1 & clock device tree nodes
+
+Also created alias for usart1 and specified oscillator clock for stm32f7
+discovery board.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/dts/stm32f746-disco.dts |  5 +++++
+ arch/arm/dts/stm32f746.dtsi      | 27 +++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/arch/arm/dts/stm32f746-disco.dts b/arch/arm/dts/stm32f746-disco.dts
+index bad0698..454b515 100644
+--- a/arch/arm/dts/stm32f746-disco.dts
++++ b/arch/arm/dts/stm32f746-disco.dts
+@@ -61,10 +61,15 @@
+ 	};
+ 
+ 	aliases {
++		serial0 = &usart1;
+ 		spi0 = &qspi;
+ 	};
+ };
+ 
++&clk_hse {
++	clock-frequency = <25000000>;
++};
++
+ &mac {
+ 	status = "okay";
+ 	phy-mode = "rmii";
+diff --git a/arch/arm/dts/stm32f746.dtsi b/arch/arm/dts/stm32f746.dtsi
+index 3902e76..afcd327 100644
+--- a/arch/arm/dts/stm32f746.dtsi
++++ b/arch/arm/dts/stm32f746.dtsi
+@@ -48,7 +48,16 @@
+ #include <dt-bindings/pinctrl/stm32f746-pinfunc.h>
+ 
+ / {
++	clocks {
++		clk_hse: clk-hse {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++		};
++};
++
+ 	soc {
++		u-boot,dm-pre-reloc;
+ 		mac: ethernet@40028000 {
+ 			compatible = "st,stm32-dwmac";
+ 			reg = <0x40028000 0x8000>;
+@@ -71,6 +80,24 @@
+ 			spi-max-frequency = <108000000>;
+ 			status = "disabled";
+ 		};
++		usart1: serial@40011000 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011000 0x400>;
++			interrupts = <37>;
++			clocks = <&rcc 0 164>;
++			status = "disabled";
++			u-boot,dm-pre-reloc;
++		};
++		rcc: rcc@40023810 {
++			#reset-cells = <1>;
++			#clock-cells = <2>;
++			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
++			reg = <0x40023800 0x400>;
++			clocks = <&clk_hse>;
++			u-boot,dm-pre-reloc;
++		};
++
++
+ 	};
+ };
+ 
+-- 
+1.9.1
+

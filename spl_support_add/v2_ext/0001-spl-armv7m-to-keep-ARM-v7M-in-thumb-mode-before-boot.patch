@@ -1,0 +1,54 @@
+From da9ae9f85e7242d82224804bdb074d6bb74d0584 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Sun, 28 May 2017 11:43:24 -0700
+Subject: [PATCH v2 1/7] spl: armv7m: to keep ARM v7M in thumb mode before
+ booting next image
+Cc: patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+On ARM v7M, the processor will return to ARM mode when executing blx
+instruction with bit 0 of the address == 0. Always set it to 1 to stay in thumb
+mode.
+
+At present, it is applied only for raw U-Boot. This patch moves it to just
+before booting next image. This way armv7m will be in thumb mode for any image
+like raw or image with header like zImage or standard U-Boot.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: Added this patch in v2
+
+ common/spl/spl.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/common/spl/spl.c b/common/spl/spl.c
+index df984b8..1bdae3e 100644
+--- a/common/spl/spl.c
++++ b/common/spl/spl.c
+@@ -121,9 +121,6 @@ void spl_set_header_raw_uboot(struct spl_image_info *spl_image)
+ {
+ 	spl_image->size = CONFIG_SYS_MONITOR_LEN;
+ 	spl_image->entry_point = CONFIG_SYS_UBOOT_START;
+-#ifdef CONFIG_CPU_V7M
+-	spl_image->entry_point |= 0x1;
+-#endif
+ 	spl_image->load_addr = CONFIG_SYS_TEXT_BASE;
+ 	spl_image->os = IH_OS_U_BOOT;
+ 	spl_image->name = "U-Boot";
+@@ -396,6 +393,9 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
+ 		hang();
+ 	}
+ 
++#ifdef CONFIG_CPU_V7M
++	spl_image.entry_point |= 0x1;
++#endif
+ 	switch (spl_image.os) {
+ 	case IH_OS_U_BOOT:
+ 		debug("Jumping to U-Boot\n");
+-- 
+1.9.1
+

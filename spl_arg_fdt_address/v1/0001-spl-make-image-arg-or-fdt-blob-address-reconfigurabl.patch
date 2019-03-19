@@ -1,0 +1,173 @@
+From b0d0aa7d85db6673cf92ee6d2fb8507722fbebc9 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 7 Apr 2017 15:10:49 -0700
+Subject: [PATCH] spl: make image arg or fdt blob address reconfigurable
+
+At present fdt blob or argument address being passed to kernel is fixed at
+compile time using macro CONFIG_SYS_SPL_ARGS_ADDR. FDT blob from
+different media like nand, nor flash are copied to the address pointed
+by the macro.
+The problem is, it makes args/fdt blob compulsory to copy which is not required
+in cases like for NOR Flash. This patch removes this limitation.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+ arch/arm/lib/spl.c        | 7 +++----
+ arch/microblaze/cpu/spl.c | 6 +++---
+ arch/powerpc/lib/spl.c    | 8 ++++----
+ common/spl/spl.c          | 6 ++++--
+ common/spl/spl_nor.c      | 8 +-------
+ include/spl.h             | 5 ++---
+ 6 files changed, 17 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/lib/spl.c b/arch/arm/lib/spl.c
+index e606d47..8ff2c50 100644
+--- a/arch/arm/lib/spl.c
++++ b/arch/arm/lib/spl.c
+@@ -44,22 +44,21 @@ void __weak board_init_f(ulong dummy)
+ /*
+  * This function jumps to an image with argument. Normally an FDT or ATAGS
+  * image.
+- * arg: Pointer to paramter image in RAM
+  */
+ #ifdef CONFIG_SPL_OS_BOOT
+-void __noreturn jump_to_image_linux(struct spl_image_info *spl_image, void *arg)
++void __noreturn jump_to_image_linux(struct spl_image_info *spl_image)
+ {
+ 	unsigned long machid = 0xffffffff;
+ #ifdef CONFIG_MACH_TYPE
+ 	machid = CONFIG_MACH_TYPE;
+ #endif
+ 
+-	debug("Entering kernel arg pointer: 0x%p\n", arg);
++	debug("Entering kernel arg pointer: 0x%p\n", spl_image->arg);
+ 	typedef void (*image_entry_arg_t)(int, int, void *)
+ 		__attribute__ ((noreturn));
+ 	image_entry_arg_t image_entry =
+ 		(image_entry_arg_t)(uintptr_t) spl_image->entry_point;
+ 	cleanup_before_linux();
+-	image_entry(0, machid, arg);
++	image_entry(0, machid, spl_image->arg);
+ }
+ #endif
+diff --git a/arch/microblaze/cpu/spl.c b/arch/microblaze/cpu/spl.c
+index 8e6d926..3d57a5a 100644
+--- a/arch/microblaze/cpu/spl.c
++++ b/arch/microblaze/cpu/spl.c
+@@ -29,15 +29,15 @@ void spl_board_init(void)
+ }
+ 
+ #ifdef CONFIG_SPL_OS_BOOT
+-void __noreturn jump_to_image_linux(struct spl_image_info *spl_image, void *arg)
++void __noreturn jump_to_image_linux(struct spl_image_info *spl_image)
+ {
+-	debug("Entering kernel arg pointer: 0x%p\n", arg);
++	debug("Entering kernel arg pointer: 0x%p\n", spl_image->arg);
+ 	typedef void (*image_entry_arg_t)(char *, ulong, ulong)
+ 		__attribute__ ((noreturn));
+ 	image_entry_arg_t image_entry =
+ 		(image_entry_arg_t)spl_image->entry_point;
+ 
+-	image_entry(NULL, 0, (ulong)arg);
++	image_entry(NULL, 0, (ulong)spl_image->arg);
+ }
+ #endif /* CONFIG_SPL_OS_BOOT */
+ 
+diff --git a/arch/powerpc/lib/spl.c b/arch/powerpc/lib/spl.c
+index 080b978..b931970 100644
+--- a/arch/powerpc/lib/spl.c
++++ b/arch/powerpc/lib/spl.c
+@@ -14,18 +14,18 @@ DECLARE_GLOBAL_DATA_PTR;
+ /*
+  * This function jumps to an image with argument. Normally an FDT or ATAGS
+  * image.
+- * arg: Pointer to paramter image in RAM
+  */
+ #ifdef CONFIG_SPL_OS_BOOT
+-void __noreturn jump_to_image_linux(struct spl_image_info *spl_image, void *arg)
++void __noreturn jump_to_image_linux(struct spl_image_info *spl_image)
+ {
+-	debug("Entering kernel arg pointer: 0x%p\n", arg);
++	debug("Entering kernel arg pointer: 0x%p\n", spl_image->arg);
+ 	typedef void (*image_entry_arg_t)(void *, ulong r4, ulong r5, ulong r6,
+ 					  ulong r7, ulong r8, ulong r9)
+ 		__attribute__ ((noreturn));
+ 	image_entry_arg_t image_entry =
+ 		(image_entry_arg_t)spl_image->entry_point;
+ 
+-	image_entry(arg, 0, 0, EPAPR_MAGIC, CONFIG_SYS_BOOTMAPSZ, 0, 0);
++	image_entry(spl_image->arg, 0, 0, EPAPR_MAGIC, CONFIG_SYS_BOOTMAPSZ,
++		    0, 0);
+ }
+ #endif /* CONFIG_SPL_OS_BOOT */
+diff --git a/common/spl/spl.c b/common/spl/spl.c
+index a3e73b8..50828e6 100644
+--- a/common/spl/spl.c
++++ b/common/spl/spl.c
+@@ -345,6 +345,9 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
+ #endif
+ 
+ 	memset(&spl_image, '\0', sizeof(spl_image));
++#ifdef CONFIG_SYS_SPL_ARGS_ADDR
++	spl_image.arg = (void *)CONFIG_SYS_SPL_ARGS_ADDR;
++#endif
+ 	board_boot_order(spl_boot_list);
+ 
+ 	if (boot_from_devices(&spl_image, spl_boot_list,
+@@ -361,8 +364,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
+ 	case IH_OS_LINUX:
+ 		debug("Jumping to Linux\n");
+ 		spl_board_prepare_for_linux();
+-		jump_to_image_linux(&spl_image,
+-				    (void *)CONFIG_SYS_SPL_ARGS_ADDR);
++		jump_to_image_linux(&spl_image);
+ #endif
+ 	default:
+ 		debug("Unsupported OS image.. Jumping nevertheless..\n");
+diff --git a/common/spl/spl_nor.c b/common/spl/spl_nor.c
+index d07ca84..1ef8ac8 100644
+--- a/common/spl/spl_nor.c
++++ b/common/spl/spl_nor.c
+@@ -39,13 +39,7 @@ static int spl_nor_load_image(struct spl_image_info *spl_image,
+ 					sizeof(struct image_header)),
+ 			       spl_image->size);
+ 
+-			/*
+-			 * Copy DT blob (fdt) to SDRAM. Passing pointer to
+-			 * flash doesn't work
+-			 */
+-			memcpy((void *)CONFIG_SYS_SPL_ARGS_ADDR,
+-			       (void *)(CONFIG_SYS_FDT_BASE),
+-			       CONFIG_SYS_FDT_SIZE);
++			spl_image->arg = (void *)CONFIG_SYS_FDT_BASE;
+ 
+ 			return 0;
+ 		} else {
+diff --git a/include/spl.h b/include/spl.h
+index 2e5b885..d1638e9 100644
+--- a/include/spl.h
++++ b/include/spl.h
+@@ -27,6 +27,7 @@ struct spl_image_info {
+ 	ulong entry_point;
+ 	u32 size;
+ 	u32 flags;
++	void *arg;
+ };
+ 
+ /*
+@@ -106,10 +107,8 @@ int spl_board_ubi_load_image(u32 boot_device);
+  * This jumps into a Linux kernel using the information in @spl_image.
+  *
+  * @spl_image: Image description to set up
+- * @arg: Argument to pass to Linux (typically a device tree pointer)
+  */
+-void __noreturn jump_to_image_linux(struct spl_image_info *spl_image,
+-				    void *arg);
++void __noreturn jump_to_image_linux(struct spl_image_info *spl_image);
+ 
+ /**
+  * spl_start_uboot() - Check if SPL should start the kernel or U-Boot
+-- 
+1.9.1
+

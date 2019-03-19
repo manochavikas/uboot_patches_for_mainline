@@ -1,0 +1,50 @@
+From 65918690c26f344ffd828b9a4a8dc6bf7c488eaf Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Sat, 4 Feb 2017 14:30:47 -0800
+Subject: [PATCH 00/10] stm32f7: add clock and pin control drivers
+
+This patchset:
+	- adds support for stm32f7 clock driver.
+	- adds support for stm32f7 pin control driver.
+	- adds device tree nodes for stm32f7 serial & clock.
+	- adds stm32f7 pin control device tree sub nodes :
+	  	- serial usart1
+		- ethernet
+		- qspi flash
+
+
+Vikas Manocha (10):
+  serial: stm32f7: add device tree support
+  clk: stm32f7: add clock driver for stm32f7 family
+  stm32f7: serial: use clock driver to enable clock
+  ARM: DT: stm32f7: add usart1 & clock device tree nodes
+  stm32f7: clk: remove usart1 clock enable from board init
+  PINCTRL: stm32f7: add pin control driver
+  ARM: DT: stm32f7: add pin control device node
+  ARM: DT: stm32f7: add pin control node for serial port pins
+  ARM: DT: stm32f7: add ethernet pin contol node
+  ARM: DT: stm32f7: add qspi pin contol node
+
+ arch/arm/dts/stm32f746-disco.dts                   |  13 ++
+ arch/arm/dts/stm32f746.dtsi                        |  72 +++++++++++
+ arch/arm/mach-stm32/stm32f7/Makefile               |   2 +-
+ arch/arm/mach-stm32/stm32f7/soc.c                  |   2 -
+ board/st/stm32f746-disco/stm32f746-disco.c         | 111 +----------------
+ configs/stm32f746-disco_defconfig                  |   4 +
+ doc/device-tree-bindings/clock/st,stm32-rcc.txt    |  95 +++++++++++++++
+ .../pinctrl/st,stm32-pinctrl.txt                   | 133 +++++++++++++++++++++
+ drivers/clk/Makefile                               |   2 +-
+ .../stm32f7/clock.c => drivers/clk/clk_stm32f7.c   |  66 +++++++++-
+ drivers/pinctrl/Kconfig                            |   9 ++
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl_stm32.c                    | 118 ++++++++++++++++++
+ drivers/serial/serial_stm32x7.c                    |  40 +++++++
+ 14 files changed, 549 insertions(+), 119 deletions(-)
+ create mode 100644 doc/device-tree-bindings/clock/st,stm32-rcc.txt
+ create mode 100644 doc/device-tree-bindings/pinctrl/st,stm32-pinctrl.txt
+ rename arch/arm/mach-stm32/stm32f7/clock.c => drivers/clk/clk_stm32f7.c (84%)
+ create mode 100644 drivers/pinctrl/pinctrl_stm32.c
+
+-- 
+1.9.1
+

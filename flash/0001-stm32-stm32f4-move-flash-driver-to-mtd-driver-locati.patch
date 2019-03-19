@@ -1,0 +1,294 @@
+From 238fece95f91138be12d294f99d83900f810a522 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 9 Mar 2016 14:42:33 -0800
+Subject: [PATCH 1/2] stm32: stm32f4: move flash driver to mtd driver location
+
+Same flash driver can be used by other stm32 families like stm32f7.
+Better place for this driver would be mtd driver location.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/arch-stm32f4/stm32.h          | 31 ++++++-------------
+ arch/arm/mach-stm32/stm32f4/Makefile               |  2 +-
+ arch/arm/mach-stm32/stm32f4/clock.c                | 10 +------
+ drivers/mtd/Makefile                               |  1 +
+ .../stm32f4/flash.c => drivers/mtd/stm32_flash.c   | 35 +++++++++++-----------
+ drivers/mtd/stm32_flash.h                          | 27 +++++++++++++++++
+ include/configs/stm32f429-discovery.h              |  1 +
+ include/flash.h                                    |  2 +-
+ 8 files changed, 59 insertions(+), 50 deletions(-)
+ rename arch/arm/mach-stm32/stm32f4/flash.c => drivers/mtd/stm32_flash.c (82%)
+ create mode 100644 drivers/mtd/stm32_flash.h
+
+diff --git a/arch/arm/include/asm/arch-stm32f4/stm32.h b/arch/arm/include/asm/arch-stm32f4/stm32.h
+index 7d6331b..6cc1966 100644
+--- a/arch/arm/include/asm/arch-stm32f4/stm32.h
++++ b/arch/arm/include/asm/arch-stm32f4/stm32.h
+@@ -82,16 +82,6 @@ struct stm32_pwr_regs {
+ 	u32 csr;
+ };
+ 
+-struct stm32_flash_regs {
+-	u32 acr;
+-	u32 key;
+-	u32 optkeyr;
+-	u32 sr;
+-	u32 cr;
+-	u32 optcr;
+-	u32 optcr1;
+-};
+-
+ /*
+  * Registers access macros
+  */
+@@ -104,18 +94,6 @@ struct stm32_flash_regs {
+ #define STM32_PWR_BASE		(STM32_APB1PERIPH_BASE + 0x7000)
+ #define STM32_PWR		((struct stm32_pwr_regs *)STM32_PWR_BASE)
+ 
+-#define STM32_FLASH_BASE	(STM32_AHB1PERIPH_BASE + 0x3C00)
+-#define STM32_FLASH		((struct stm32_flash_regs *)STM32_FLASH_BASE)
+-
+-#define STM32_FLASH_SR_BSY		(1 << 16)
+-
+-#define STM32_FLASH_CR_PG		(1 << 0)
+-#define STM32_FLASH_CR_SER		(1 << 1)
+-#define STM32_FLASH_CR_STRT		(1 << 16)
+-#define STM32_FLASH_CR_LOCK		(1 << 31)
+-#define STM32_FLASH_CR_SNB_OFFSET	3
+-#define STM32_FLASH_CR_SNB_MASK		(15 << STM32_FLASH_CR_SNB_OFFSET)
+-
+ /*
+  * Peripheral base addresses
+  */
+@@ -124,6 +102,14 @@ struct stm32_flash_regs {
+ #define STM32_USART3_BASE	(STM32_APB1PERIPH_BASE + 0x4800)
+ #define STM32_USART6_BASE	(STM32_APB2PERIPH_BASE + 0x1400)
+ 
++#define FLASH_CNTL_BASE		(STM32_AHB1PERIPH_BASE + 0x3C00)
++
++static const u32 sect_sz_kb[CONFIG_SYS_MAX_FLASH_SECT] = {
++	[0 ... 3] =	16 * 1024,
++	[4] =		64 * 1024,
++	[5 ... 11] =	128 * 1024
++};
++
+ enum clock {
+ 	CLOCK_CORE,
+ 	CLOCK_AHB,
+@@ -133,5 +119,6 @@ enum clock {
+ 
+ int configure_clocks(void);
+ unsigned long clock_get(enum clock clck);
++void stm32_flash_latency_cfg(int latency);
+ 
+ #endif /* _MACH_STM32_H_ */
+diff --git a/arch/arm/mach-stm32/stm32f4/Makefile b/arch/arm/mach-stm32/stm32f4/Makefile
+index 42d01db..020e783 100644
+--- a/arch/arm/mach-stm32/stm32f4/Makefile
++++ b/arch/arm/mach-stm32/stm32f4/Makefile
+@@ -8,4 +8,4 @@
+ # SPDX-License-Identifier:	GPL-2.0+
+ #
+ 
+-obj-y += soc.o clock.o timer.o flash.o
++obj-y += soc.o clock.o timer.o
+diff --git a/arch/arm/mach-stm32/stm32f4/clock.c b/arch/arm/mach-stm32/stm32f4/clock.c
+index 631f36a..15fcadb 100644
+--- a/arch/arm/mach-stm32/stm32f4/clock.c
++++ b/arch/arm/mach-stm32/stm32f4/clock.c
+@@ -66,11 +66,6 @@
+ #define PWR_CR_VOS_SCALE_MODE_2	(PWR_CR_VOS1)
+ #define PWR_CR_VOS_SCALE_MODE_3	(PWR_CR_VOS0)
+ 
+-#define FLASH_ACR_WS(n)		n
+-#define FLASH_ACR_PRFTEN	(1 << 8)
+-#define FLASH_ACR_ICEN		(1 << 9)
+-#define FLASH_ACR_DCEN		(1 << 10)
+-
+ /*
+  * RCC GPIO specific definitions
+  */
+@@ -181,10 +176,7 @@ int configure_clocks(void)
+ 	while (!(readl(&STM32_RCC->cr) & RCC_CR_PLLRDY))
+ 		;
+ 
+-	/* 5 wait states, Prefetch enabled, D-Cache enabled, I-Cache enabled */
+-	writel(FLASH_ACR_WS(5) | FLASH_ACR_PRFTEN | FLASH_ACR_ICEN
+-		| FLASH_ACR_DCEN, &STM32_FLASH->acr);
+-
++	stm32_flash_latency_cfg(5);
+ 	clrbits_le32(&STM32_RCC->cfgr, (RCC_CFGR_SW0 | RCC_CFGR_SW1));
+ 	setbits_le32(&STM32_RCC->cfgr, RCC_CFGR_SW_PLL);
+ 
+diff --git a/drivers/mtd/Makefile b/drivers/mtd/Makefile
+index 7f018a4..703700a 100644
+--- a/drivers/mtd/Makefile
++++ b/drivers/mtd/Makefile
+@@ -20,3 +20,4 @@ obj-$(CONFIG_FTSMC020) += ftsmc020.o
+ obj-$(CONFIG_FLASH_CFI_LEGACY) += jedec_flash.o
+ obj-$(CONFIG_MW_EEPROM) += mw_eeprom.o
+ obj-$(CONFIG_ST_SMI) += st_smi.o
++obj-$(CONFIG_STM32_FLASH) += stm32_flash.o
+diff --git a/arch/arm/mach-stm32/stm32f4/flash.c b/drivers/mtd/stm32_flash.c
+similarity index 82%
+rename from arch/arm/mach-stm32/stm32f4/flash.c
+rename to drivers/mtd/stm32_flash.c
+index a379f47..71f4854 100644
+--- a/arch/arm/mach-stm32/stm32f4/flash.c
++++ b/drivers/mtd/stm32_flash.c
+@@ -8,19 +8,20 @@
+ #include <common.h>
+ #include <asm/io.h>
+ #include <asm/arch/stm32.h>
+-
+-#define STM32_FLASH_KEY1	0x45670123
+-#define STM32_FLASH_KEY2	0xCDEF89AB
++#include "stm32_flash.h"
+ 
+ flash_info_t flash_info[CONFIG_SYS_MAX_FLASH_BANKS];
+ 
+-const u32 sect_sz_kb[CONFIG_SYS_MAX_FLASH_SECT] = {
+-	[0 ... 3] =	16 * 1024,
+-	[4] =		64 * 1024,
+-	[5 ... 11] =	128 * 1024
+-};
++#define STM32_FLASH		((struct stm32_flash_regs *)FLASH_CNTL_BASE)
++
++void stm32_flash_latency_cfg(int latency)
++{
++	/* 5 wait states, Prefetch enabled, D-Cache enabled, I-Cache enabled */
++	writel(FLASH_ACR_WS(5) | FLASH_ACR_PRFTEN | FLASH_ACR_ICEN
++		| FLASH_ACR_DCEN, &STM32_FLASH->acr);
++}
+ 
+-static void stm32f4_flash_lock(u8 lock)
++static void stm32_flash_lock(u8 lock)
+ {
+ 	if (lock) {
+ 		setbits_le32(&STM32_FLASH->cr, STM32_FLASH_CR_LOCK);
+@@ -36,7 +37,7 @@ unsigned long flash_init(void)
+ 	u8 i, j;
+ 
+ 	for (i = 0; i < CONFIG_SYS_MAX_FLASH_BANKS; i++) {
+-		flash_info[i].flash_id = FLASH_STM32F4;
++		flash_info[i].flash_id = FLASH_STM32;
+ 		flash_info[i].sector_count = CONFIG_SYS_MAX_FLASH_SECT;
+ 		flash_info[i].start[0] = CONFIG_SYS_FLASH_BASE + (i << 20);
+ 		flash_info[i].size = sect_sz_kb[0];
+@@ -58,8 +59,8 @@ void flash_print_info(flash_info_t *info)
+ 	if (info->flash_id == FLASH_UNKNOWN) {
+ 		printf("missing or unknown FLASH type\n");
+ 		return;
+-	} else if (info->flash_id == FLASH_STM32F4) {
+-		printf("STM32F4 Embedded Flash\n");
++	} else if (info->flash_id == FLASH_STM32) {
++		printf("stm32 Embedded Flash\n");
+ 	}
+ 
+ 	printf("  Size: %ld MB in %d Sectors\n",
+@@ -91,7 +92,7 @@ int flash_erase(flash_info_t *info, int first, int last)
+ 	if (bank == 0xFF)
+ 		return -1;
+ 
+-	stm32f4_flash_lock(0);
++	stm32_flash_lock(0);
+ 
+ 	for (i = first; i <= last; i++) {
+ 		while (readl(&STM32_FLASH->sr) & STM32_FLASH_SR_BSY)
+@@ -107,7 +108,7 @@ int flash_erase(flash_info_t *info, int first, int last)
+ 			setbits_le32(&STM32_FLASH->cr,
+ 				     ((0x10 | i) << STM32_FLASH_CR_SNB_OFFSET));
+ 		} else {
+-			stm32f4_flash_lock(1);
++			stm32_flash_lock(1);
+ 			return -1;
+ 		}
+ 		setbits_le32(&STM32_FLASH->cr, STM32_FLASH_CR_SER);
+@@ -119,7 +120,7 @@ int flash_erase(flash_info_t *info, int first, int last)
+ 		clrbits_le32(&STM32_FLASH->cr, STM32_FLASH_CR_SER);
+ 	}
+ 
+-	stm32f4_flash_lock(1);
++	stm32_flash_lock(1);
+ 	return 0;
+ }
+ 
+@@ -130,7 +131,7 @@ int write_buff(flash_info_t *info, uchar *src, ulong addr, ulong cnt)
+ 	while (readl(&STM32_FLASH->sr) & STM32_FLASH_SR_BSY)
+ 		;
+ 
+-	stm32f4_flash_lock(0);
++	stm32_flash_lock(0);
+ 
+ 	setbits_le32(&STM32_FLASH->cr, STM32_FLASH_CR_PG);
+ 	/* To make things simple use byte writes only */
+@@ -140,7 +141,7 @@ int write_buff(flash_info_t *info, uchar *src, ulong addr, ulong cnt)
+ 			;
+ 	}
+ 	clrbits_le32(&STM32_FLASH->cr, STM32_FLASH_CR_PG);
+-	stm32f4_flash_lock(1);
++	stm32_flash_lock(1);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/mtd/stm32_flash.h b/drivers/mtd/stm32_flash.h
+new file mode 100644
+index 0000000..8cb81ef
+--- /dev/null
++++ b/drivers/mtd/stm32_flash.h
+@@ -0,0 +1,27 @@
++struct stm32_flash_regs {
++	u32 acr;
++	u32 key;
++	u32 optkeyr;
++	u32 sr;
++	u32 cr;
++	u32 optcr;
++	u32 optcr1;
++};
++
++#define STM32_FLASH_KEY1	0x45670123
++#define STM32_FLASH_KEY2	0xCDEF89AB
++
++#define STM32_FLASH_SR_BSY		(1 << 16)
++
++#define STM32_FLASH_CR_PG		(1 << 0)
++#define STM32_FLASH_CR_SER		(1 << 1)
++#define STM32_FLASH_CR_STRT		(1 << 16)
++#define STM32_FLASH_CR_LOCK		(1 << 31)
++#define STM32_FLASH_CR_SNB_OFFSET	3
++#define STM32_FLASH_CR_SNB_MASK		(15 << STM32_FLASH_CR_SNB_OFFSET)
++
++/* Flash ACR: Access control register */
++#define FLASH_ACR_WS(n)		n
++#define FLASH_ACR_PRFTEN	(1 << 8)
++#define FLASH_ACR_ICEN		(1 << 9)
++#define FLASH_ACR_DCEN		(1 << 10)
+diff --git a/include/configs/stm32f429-discovery.h b/include/configs/stm32f429-discovery.h
+index 85d492d..87901e8 100644
+--- a/include/configs/stm32f429-discovery.h
++++ b/include/configs/stm32f429-discovery.h
+@@ -49,6 +49,7 @@
+ #define CONFIG_GREEN_LED		109
+ 
+ #define CONFIG_STM32_GPIO
++#define CONFIG_STM32_FLASH
+ #define CONFIG_STM32_SERIAL
+ 
+ #define CONFIG_STM32_HSE_HZ		8000000
+diff --git a/include/flash.h b/include/flash.h
+index f53ace7..c6321a0 100644
+--- a/include/flash.h
++++ b/include/flash.h
+@@ -465,7 +465,7 @@ extern flash_info_t *flash_get_info(ulong base);
+ #define FLASH_S29GL064M 0x00F0		/* Spansion S29GL064M-R6		*/
+ #define FLASH_S29GL128N 0x00F1		/* Spansion S29GL128N			*/
+ 
+-#define FLASH_STM32F4	0x00F2		/* STM32F4 Embedded Flash */
++#define FLASH_STM32	0x00F2		/* STM32 Embedded Flash */
+ #define FLASH_STM32F1	0x00F3		/* STM32F1 Embedded Flash */
+ 
+ #define FLASH_UNKNOWN	0xFFFF		/* unknown flash type			*/
+-- 
+1.9.1
+

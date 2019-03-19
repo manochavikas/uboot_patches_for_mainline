@@ -1,0 +1,94 @@
+From ce438de1b0088c332cc360303f69d5522f1367f0 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 9 Feb 2016 12:15:44 -0800
+Subject: [PATCH 2/4] gpio: stm32_gpio: move base addresses to the soc file
+
+Base addresses for GPIOs could be different for different socs, this
+patch moves the base addresses from driver to the soc specific location.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/arch-stm32f1/stm32.h |  8 ++++++++
+ arch/arm/include/asm/arch-stm32f4/stm32.h | 10 ++++++++++
+ drivers/gpio/stm32_gpio.c                 | 18 ------------------
+ 3 files changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch-stm32f1/stm32.h b/arch/arm/include/asm/arch-stm32f1/stm32.h
+index 4094a75..1af73c5 100644
+--- a/arch/arm/include/asm/arch-stm32f1/stm32.h
++++ b/arch/arm/include/asm/arch-stm32f1/stm32.h
+@@ -24,6 +24,14 @@
+ 
+ #define STM32_BUS_MASK		0xFFFF0000
+ 
++#define STM32_GPIOA_BASE	(STM32_APB2PERIPH_BASE + 0x0800)
++#define STM32_GPIOB_BASE	(STM32_APB2PERIPH_BASE + 0x0C00)
++#define STM32_GPIOC_BASE	(STM32_APB2PERIPH_BASE + 0x1000)
++#define STM32_GPIOD_BASE	(STM32_APB2PERIPH_BASE + 0x1400)
++#define STM32_GPIOE_BASE	(STM32_APB2PERIPH_BASE + 0x1800)
++#define STM32_GPIOF_BASE	(STM32_APB2PERIPH_BASE + 0x1C00)
++#define STM32_GPIOG_BASE	(STM32_APB2PERIPH_BASE + 0x2000)
++
+ /*
+  * Register maps
+  */
+diff --git a/arch/arm/include/asm/arch-stm32f4/stm32.h b/arch/arm/include/asm/arch-stm32f4/stm32.h
+index 6b64d03..7d6331b 100644
+--- a/arch/arm/include/asm/arch-stm32f4/stm32.h
++++ b/arch/arm/include/asm/arch-stm32f4/stm32.h
+@@ -23,6 +23,16 @@
+ 
+ #define STM32_BUS_MASK		0xFFFF0000
+ 
++#define STM32_GPIOA_BASE	(STM32_AHB1PERIPH_BASE + 0x0000)
++#define STM32_GPIOB_BASE	(STM32_AHB1PERIPH_BASE + 0x0400)
++#define STM32_GPIOC_BASE	(STM32_AHB1PERIPH_BASE + 0x0800)
++#define STM32_GPIOD_BASE	(STM32_AHB1PERIPH_BASE + 0x0C00)
++#define STM32_GPIOE_BASE	(STM32_AHB1PERIPH_BASE + 0x1000)
++#define STM32_GPIOF_BASE	(STM32_AHB1PERIPH_BASE + 0x1400)
++#define STM32_GPIOG_BASE	(STM32_AHB1PERIPH_BASE + 0x1800)
++#define STM32_GPIOH_BASE	(STM32_AHB1PERIPH_BASE + 0x1C00)
++#define STM32_GPIOI_BASE	(STM32_AHB1PERIPH_BASE + 0x2000)
++
+ /*
+  * Register maps
+  */
+diff --git a/drivers/gpio/stm32_gpio.c b/drivers/gpio/stm32_gpio.c
+index 9f9ff48..739de01 100644
+--- a/drivers/gpio/stm32_gpio.c
++++ b/drivers/gpio/stm32_gpio.c
+@@ -20,16 +20,6 @@
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #if defined(CONFIG_STM32F4)
+-#define STM32_GPIOA_BASE	(STM32_AHB1PERIPH_BASE + 0x0000)
+-#define STM32_GPIOB_BASE	(STM32_AHB1PERIPH_BASE + 0x0400)
+-#define STM32_GPIOC_BASE	(STM32_AHB1PERIPH_BASE + 0x0800)
+-#define STM32_GPIOD_BASE	(STM32_AHB1PERIPH_BASE + 0x0C00)
+-#define STM32_GPIOE_BASE	(STM32_AHB1PERIPH_BASE + 0x1000)
+-#define STM32_GPIOF_BASE	(STM32_AHB1PERIPH_BASE + 0x1400)
+-#define STM32_GPIOG_BASE	(STM32_AHB1PERIPH_BASE + 0x1800)
+-#define STM32_GPIOH_BASE	(STM32_AHB1PERIPH_BASE + 0x1C00)
+-#define STM32_GPIOI_BASE	(STM32_AHB1PERIPH_BASE + 0x2000)
+-
+ static const unsigned long io_base[] = {
+ 	STM32_GPIOA_BASE, STM32_GPIOB_BASE, STM32_GPIOC_BASE,
+ 	STM32_GPIOD_BASE, STM32_GPIOE_BASE, STM32_GPIOF_BASE,
+@@ -85,14 +75,6 @@ out:
+ 	return rv;
+ }
+ #elif defined(CONFIG_STM32F1)
+-#define STM32_GPIOA_BASE	(STM32_APB2PERIPH_BASE + 0x0800)
+-#define STM32_GPIOB_BASE	(STM32_APB2PERIPH_BASE + 0x0C00)
+-#define STM32_GPIOC_BASE	(STM32_APB2PERIPH_BASE + 0x1000)
+-#define STM32_GPIOD_BASE	(STM32_APB2PERIPH_BASE + 0x1400)
+-#define STM32_GPIOE_BASE	(STM32_APB2PERIPH_BASE + 0x1800)
+-#define STM32_GPIOF_BASE	(STM32_APB2PERIPH_BASE + 0x1C00)
+-#define STM32_GPIOG_BASE	(STM32_APB2PERIPH_BASE + 0x2000)
+-
+ static const unsigned long io_base[] = {
+ 	STM32_GPIOA_BASE, STM32_GPIOB_BASE, STM32_GPIOC_BASE,
+ 	STM32_GPIOD_BASE, STM32_GPIOE_BASE, STM32_GPIOF_BASE,
+-- 
+1.9.1
+

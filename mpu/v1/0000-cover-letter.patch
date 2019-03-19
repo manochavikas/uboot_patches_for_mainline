@@ -1,0 +1,27 @@
+From 03a5a0990654aaa0097fe5e72a58a72449894c7e Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 3 May 2017 16:34:11 -0700
+Subject: [PATCH 0/4] armv7m: add memory protection unit support
+
+This patchset adds memory protection unit support(MPU) support & configures it
+for stm32f4 & stm32f7.
+
+Vikas Manocha (4):
+  armv7m: correct mpu region size define for 8MB size
+  armv7m: add MPU configuration support
+  stm32: use armv7m MPU configuration support
+  stm32f7: configure mpu valid for f7 family
+
+ arch/arm/cpu/armv7m/Makefile      |  2 +-
+ arch/arm/cpu/armv7m/mpu.c         | 82 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/armv7m.h     | 19 ---------
+ arch/arm/include/asm/armv7m_mpu.h | 67 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-stm32/stm32f4/soc.c | 16 ++++----
+ arch/arm/mach-stm32/stm32f7/soc.c | 63 ++++++++----------------------
+ 6 files changed, 176 insertions(+), 73 deletions(-)
+ create mode 100644 arch/arm/cpu/armv7m/mpu.c
+ create mode 100644 arch/arm/include/asm/armv7m_mpu.h
+
+-- 
+1.9.1
+

@@ -1,0 +1,54 @@
+From 12677a2ffa6994094c2469afab562438e1aad9c4 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 10 Feb 2017 14:41:34 -0800
+Subject: [PATCH v2 00/10] stm32f7: add clock and pin control drivers
+
+This patchset:
+	- adds support for stm32f7 clock driver.
+	- adds support for stm32f7 pin control driver.
+	- adds device tree nodes for stm32f7 serial & clock.
+	- adds stm32f7 pin control device tree sub nodes :
+	  	- serial usart1
+		- ethernet
+		- qspi flash
+
+Changed in v2:
+- added removed blank lines in code.
+- removed not used functions.
+- changed fixed length array read from device node to relaxed length read.
+
+Vikas Manocha (10):
+  serial: stm32f7: add device tree support
+  clk: stm32f7: add clock driver for stm32f7 family
+  stm32f7: serial: use clock driver to enable clock
+  ARM: DT: stm32f7: add usart1 & clock device tree nodes
+  stm32f7: clk: remove usart1 clock enable from board init
+  PINCTRL: stm32f7: add pin control driver
+  ARM: DT: stm32f7: add pin control device node
+  ARM: DT: stm32f7: add pin control node for serial port pins
+  ARM: DT: stm32f7: add ethernet pin contol node
+  ARM: DT: stm32f7: add qspi pin contol node
+
+ arch/arm/dts/stm32f746-disco.dts                   |  13 ++
+ arch/arm/dts/stm32f746.dtsi                        |  72 +++++++++++
+ arch/arm/mach-stm32/stm32f7/Makefile               |   2 +-
+ arch/arm/mach-stm32/stm32f7/soc.c                  |   2 -
+ board/st/stm32f746-disco/stm32f746-disco.c         | 111 +----------------
+ configs/stm32f746-disco_defconfig                  |   4 +
+ doc/device-tree-bindings/clock/st,stm32-rcc.txt    |  95 +++++++++++++++
+ .../pinctrl/st,stm32-pinctrl.txt                   | 133 +++++++++++++++++++++
+ drivers/clk/Makefile                               |   2 +-
+ .../stm32f7/clock.c => drivers/clk/clk_stm32f7.c   |  64 +++++++++-
+ drivers/pinctrl/Kconfig                            |   9 ++
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl_stm32.c                    | 121 +++++++++++++++++++
+ drivers/serial/serial_stm32x7.c                    |  42 +++++++
+ 14 files changed, 552 insertions(+), 119 deletions(-)
+ create mode 100644 doc/device-tree-bindings/clock/st,stm32-rcc.txt
+ create mode 100644 doc/device-tree-bindings/pinctrl/st,stm32-pinctrl.txt
+ rename arch/arm/mach-stm32/stm32f7/clock.c => drivers/clk/clk_stm32f7.c (85%)
+ create mode 100644 drivers/pinctrl/pinctrl_stm32.c
+
+-- 
+1.9.1
+

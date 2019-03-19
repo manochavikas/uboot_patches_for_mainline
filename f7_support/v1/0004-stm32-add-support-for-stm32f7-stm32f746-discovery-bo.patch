@@ -1,0 +1,962 @@
+From e91e3141b1da6905853edbf6f6ff8d88df703da2 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 19 Jan 2016 15:19:44 -0800
+Subject: [PATCH 4/4] stm32: add support for stm32f7 & stm32f746 discovery
+ board
+
+This patch adds support for stm32f7 family & stm32f746 board.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/arch-stm32f7/gpio.h         | 113 +++++++++++++++++++++++
+ arch/arm/include/asm/arch-stm32f7/gpt.h          |  53 +++++++++++
+ arch/arm/include/asm/arch-stm32f7/rcc.h          |  64 +++++++++++++
+ arch/arm/include/asm/arch-stm32f7/stm32.h        |  63 +++++++++++++
+ arch/arm/include/asm/arch-stm32f7/stm32_defs.h   |  15 +++
+ arch/arm/include/asm/arch-stm32f7/stm32_periph.h |  38 ++++++++
+ arch/arm/mach-stm32/Kconfig                      |   4 +
+ arch/arm/mach-stm32/Makefile                     |   1 +
+ arch/arm/mach-stm32/stm32f7/Kconfig              |   8 ++
+ arch/arm/mach-stm32/stm32f7/Makefile             |   8 ++
+ arch/arm/mach-stm32/stm32f7/clock.c              |  56 +++++++++++
+ arch/arm/mach-stm32/stm32f7/timer.c              | 112 ++++++++++++++++++++++
+ board/st/stm32f746-disco/Kconfig                 |  19 ++++
+ board/st/stm32f746-disco/MAINTAINERS             |   6 ++
+ board/st/stm32f746-disco/Makefile                |   8 ++
+ board/st/stm32f746-disco/stm32f746-disco.c       |  99 ++++++++++++++++++++
+ configs/stm32f746-disco_defconfig                |   9 ++
+ drivers/gpio/stm32_gpio.c                        |   6 +-
+ include/configs/stm32f746-disco.h                |  89 ++++++++++++++++++
+ 19 files changed, 768 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/gpio.h
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/gpt.h
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/rcc.h
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/stm32.h
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/stm32_defs.h
+ create mode 100644 arch/arm/include/asm/arch-stm32f7/stm32_periph.h
+ create mode 100644 arch/arm/mach-stm32/stm32f7/Kconfig
+ create mode 100644 arch/arm/mach-stm32/stm32f7/Makefile
+ create mode 100644 arch/arm/mach-stm32/stm32f7/clock.c
+ create mode 100644 arch/arm/mach-stm32/stm32f7/timer.c
+ create mode 100644 board/st/stm32f746-disco/Kconfig
+ create mode 100644 board/st/stm32f746-disco/MAINTAINERS
+ create mode 100644 board/st/stm32f746-disco/Makefile
+ create mode 100644 board/st/stm32f746-disco/stm32f746-disco.c
+ create mode 100644 configs/stm32f746-disco_defconfig
+ create mode 100644 include/configs/stm32f746-disco.h
+
+diff --git a/arch/arm/include/asm/arch-stm32f7/gpio.h b/arch/arm/include/asm/arch-stm32f7/gpio.h
+new file mode 100644
+index 0000000..2942cd9
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/gpio.h
+@@ -0,0 +1,113 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _STM32_GPIO_H_
++#define _STM32_GPIO_H_
++
++enum stm32_gpio_port {
++	STM32_GPIO_PORT_A = 0,
++	STM32_GPIO_PORT_B,
++	STM32_GPIO_PORT_C,
++	STM32_GPIO_PORT_D,
++	STM32_GPIO_PORT_E,
++	STM32_GPIO_PORT_F,
++	STM32_GPIO_PORT_G,
++	STM32_GPIO_PORT_H,
++	STM32_GPIO_PORT_I
++};
++
++enum stm32_gpio_pin {
++	STM32_GPIO_PIN_0 = 0,
++	STM32_GPIO_PIN_1,
++	STM32_GPIO_PIN_2,
++	STM32_GPIO_PIN_3,
++	STM32_GPIO_PIN_4,
++	STM32_GPIO_PIN_5,
++	STM32_GPIO_PIN_6,
++	STM32_GPIO_PIN_7,
++	STM32_GPIO_PIN_8,
++	STM32_GPIO_PIN_9,
++	STM32_GPIO_PIN_10,
++	STM32_GPIO_PIN_11,
++	STM32_GPIO_PIN_12,
++	STM32_GPIO_PIN_13,
++	STM32_GPIO_PIN_14,
++	STM32_GPIO_PIN_15
++};
++
++enum stm32_gpio_mode {
++	STM32_GPIO_MODE_IN = 0,
++	STM32_GPIO_MODE_OUT,
++	STM32_GPIO_MODE_AF,
++	STM32_GPIO_MODE_AN
++};
++
++enum stm32_gpio_otype {
++	STM32_GPIO_OTYPE_PP = 0,
++	STM32_GPIO_OTYPE_OD
++};
++
++enum stm32_gpio_speed {
++	STM32_GPIO_SPEED_2M = 0,
++	STM32_GPIO_SPEED_25M,
++	STM32_GPIO_SPEED_50M,
++	STM32_GPIO_SPEED_100M
++};
++
++enum stm32_gpio_pupd {
++	STM32_GPIO_PUPD_NO = 0,
++	STM32_GPIO_PUPD_UP,
++	STM32_GPIO_PUPD_DOWN
++};
++
++enum stm32_gpio_af {
++	STM32_GPIO_AF0 = 0,
++	STM32_GPIO_AF1,
++	STM32_GPIO_AF2,
++	STM32_GPIO_AF3,
++	STM32_GPIO_AF4,
++	STM32_GPIO_AF5,
++	STM32_GPIO_AF6,
++	STM32_GPIO_AF7,
++	STM32_GPIO_AF8,
++	STM32_GPIO_AF9,
++	STM32_GPIO_AF10,
++	STM32_GPIO_AF11,
++	STM32_GPIO_AF12,
++	STM32_GPIO_AF13,
++	STM32_GPIO_AF14,
++	STM32_GPIO_AF15
++};
++
++struct stm32_gpio_dsc {
++	enum stm32_gpio_port	port;
++	enum stm32_gpio_pin	pin;
++};
++
++struct stm32_gpio_ctl {
++	enum stm32_gpio_mode	mode;
++	enum stm32_gpio_otype	otype;
++	enum stm32_gpio_speed	speed;
++	enum stm32_gpio_pupd	pupd;
++	enum stm32_gpio_af	af;
++};
++
++static inline unsigned stm32_gpio_to_port(unsigned gpio)
++{
++	return gpio / 16;
++}
++
++static inline unsigned stm32_gpio_to_pin(unsigned gpio)
++{
++	return gpio % 16;
++}
++
++int stm32_gpio_config(const struct stm32_gpio_dsc *gpio_dsc,
++		const struct stm32_gpio_ctl *gpio_ctl);
++int stm32_gpout_set(const struct stm32_gpio_dsc *gpio_dsc, int state);
++
++#endif /* _STM32_GPIO_H_ */
+diff --git a/arch/arm/include/asm/arch-stm32f7/gpt.h b/arch/arm/include/asm/arch-stm32f7/gpt.h
+new file mode 100644
+index 0000000..903bdf6
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/gpt.h
+@@ -0,0 +1,53 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _STM32_GPT_H
++#define _STM32_GPT_H
++
++#include <asm/arch/stm32.h>
++
++struct gpt_regs {
++	u32 cr1;
++	u32 cr2;
++	u32 smcr;
++	u32 dier;
++	u32 sr;
++	u32 egr;
++	u32 ccmr1;
++	u32 ccmr2;
++	u32 ccer;
++	u32 cnt;
++	u32 psc;
++	u32 arr;
++	u32 reserved;
++	u32 ccr1;
++	u32 ccr2;
++	u32 ccr3;
++	u32 ccr4;
++	u32 reserved1;
++	u32 dcr;
++	u32 dmar;
++	u32 tim2_5_or;
++};
++
++struct gpt_regs *const gpt1_regs_ptr =
++	(struct gpt_regs *)TIM2_BASE;
++
++/* Timer control1 register  */
++#define GPT_CR1_CEN			0x0001
++#define GPT_MODE_AUTO_RELOAD		(1 << 7)
++
++/* Auto reload register for free running config */
++#define GPT_FREE_RUNNING		0xFFFFFFFF
++
++/* Timer, HZ specific defines */
++#define CONFIG_STM32_HZ			1000
++
++/* Timer Event Generation registers */
++#define TIM_EGR_UG			(1 << 0)
++
++#endif
+diff --git a/arch/arm/include/asm/arch-stm32f7/rcc.h b/arch/arm/include/asm/arch-stm32f7/rcc.h
+new file mode 100644
+index 0000000..8bfb7b6
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/rcc.h
+@@ -0,0 +1,64 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _STM32_RCC_H
++#define _STM32_RCC_H
++
++#define RCC_CR		0x00	/* clock control */
++#define RCC_PLLCFGR	0x04	/* PLL configuration */
++#define RCC_CFGR	0x08	/* clock configuration */
++#define RCC_CIR		0x0C	/* clock interrupt */
++#define RCC_AHB1RSTR	0x10	/* AHB1 peripheral reset */
++#define RCC_AHB2RSTR	0x14	/* AHB2 peripheral reset */
++#define RCC_AHB3RSTR	0x18	/* AHB3 peripheral reset */
++#define RCC_APB1RSTR	0x20	/* APB1 peripheral reset */
++#define RCC_APB2RSTR	0x24	/* APB2 peripheral reset */
++#define RCC_AHB1ENR	0x30	/* AHB1 peripheral clock enable */
++#define RCC_AHB2ENR	0x34	/* AHB2 peripheral clock enable */
++#define RCC_AHB3ENR	0x38	/* AHB3 peripheral clock enable */
++#define RCC_APB1ENR	0x40	/* APB1 peripheral clock enable */
++#define RCC_APB2ENR	0x44	/* APB2 peripheral clock enable */
++#define RCC_AHB1LPENR	0x50	/* periph clk enable in low pwr mode */
++#define RCC_AHB2LPENR	0x54	/* AHB2 periph clk enable in low pwr mode */
++#define RCC_AHB3LPENR	0x58	/* AHB3 periph clk enable in low pwr mode */
++#define RCC_APB1LPENR	0x60	/* APB1 periph clk enable in low pwr mode */
++#define RCC_APB2LPENR	0x64	/* APB2 periph clk enable in low pwr mode */
++#define RCC_BDCR	0x70	/* Backup domain control */
++#define RCC_CSR		0x74	/* clock control & status */
++#define RCC_SSCGR	0x80	/* spread spectrum clock generation */
++#define RCC_PLLI2SCFGR	0x84	/* PLLI2S configuration */
++#define RCC_PLLSAICFG	0x88	/* PLLSAI configuration */
++#define RCC_DCKCFG1	0x8C	/* dedicated clocks configuration register */
++#define RCC_DCKCFG2	0x90	/* dedicated clocks configuration register */
++
++#define RCC_APB1ENR_TIM2EN		(1 << 0)
++#define RCC_APB1ENR_PWREN		(1 << 28)
++
++/*
++ * RCC USART specific definitions
++ */
++#define RCC_ENR_USART1EN		(1 << 4)
++#define RCC_ENR_USART2EN		(1 << 17)
++#define RCC_ENR_USART3EN		(1 << 18)
++#define RCC_ENR_USART6EN		(1 <<  5)
++
++/*
++ * RCC GPIO specific definitions
++ */
++#define RCC_ENR_GPIO_A_EN		(1 << 0)
++#define RCC_ENR_GPIO_B_EN		(1 << 1)
++#define RCC_ENR_GPIO_C_EN		(1 << 2)
++#define RCC_ENR_GPIO_D_EN		(1 << 3)
++#define RCC_ENR_GPIO_E_EN		(1 << 4)
++#define RCC_ENR_GPIO_F_EN		(1 << 5)
++#define RCC_ENR_GPIO_G_EN		(1 << 6)
++#define RCC_ENR_GPIO_H_EN		(1 << 7)
++#define RCC_ENR_GPIO_I_EN		(1 << 8)
++#define RCC_ENR_GPIO_J_EN		(1 << 9)
++#define RCC_ENR_GPIO_K_EN		(1 << 10)
++
++#endif
+diff --git a/arch/arm/include/asm/arch-stm32f7/stm32.h b/arch/arm/include/asm/arch-stm32f7/stm32.h
+new file mode 100644
+index 0000000..713eb2e
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/stm32.h
+@@ -0,0 +1,63 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, STMicroelectronics, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _ASM_ARCH_HARDWARE_H
++#define _ASM_ARCH_HARDWARE_H
++
++/* STM32F746 */
++#define ITCM_FLASH_BASE		0x00200000UL
++#define AXIM_FLASH_BASE		0x08000000UL
++
++#define ITCM_SRAM_BASE		0x00000000UL
++#define DTCM_SRAM_BASE		0x20000000UL
++#define SRAM1_BASE		0x20010000UL
++#define SRAM2_BASE		0x2004C000UL
++
++#define PERIPH_BASE		0x40000000UL
++
++#define APB1_PERIPH_BASE	(PERIPH_BASE + 0x00000000)
++#define APB2_PERIPH_BASE	(PERIPH_BASE + 0x00010000)
++#define AHB1_PERIPH_BASE	(PERIPH_BASE + 0x00020000)
++#define AHB2_PERIPH_BASE	(PERIPH_BASE + 0x10000000)
++#define AHB3_PERIPH_BASE	(PERIPH_BASE + 0x20000000)
++
++#define TIM2_BASE		(APB1_PERIPH_BASE + 0x0000)
++#define USART2_BASE		(APB1_PERIPH_BASE + 0x4400)
++#define USART3_BASE		(APB1_PERIPH_BASE + 0x4800)
++#define PWR_BASE		(APB1_PERIPH_BASE + 0x7000)
++
++#define USART1_BASE		(APB2_PERIPH_BASE + 0x1000)
++#define USART6_BASE		(APB2_PERIPH_BASE + 0x1400)
++
++#define STM32_GPIOA_BASE	(AHB1_PERIPH_BASE + 0x0000)
++#define STM32_GPIOB_BASE	(AHB1_PERIPH_BASE + 0x0400)
++#define STM32_GPIOC_BASE	(AHB1_PERIPH_BASE + 0x0800)
++#define STM32_GPIOD_BASE	(AHB1_PERIPH_BASE + 0x0C00)
++#define STM32_GPIOE_BASE	(AHB1_PERIPH_BASE + 0x1000)
++#define STM32_GPIOF_BASE	(AHB1_PERIPH_BASE + 0x1400)
++#define STM32_GPIOG_BASE	(AHB1_PERIPH_BASE + 0x1800)
++#define STM32_GPIOH_BASE	(AHB1_PERIPH_BASE + 0x1C00)
++#define STM32_GPIOI_BASE	(AHB1_PERIPH_BASE + 0x2000)
++#define STM32_GPIOJ_BASE	(AHB1_PERIPH_BASE + 0x2400)
++#define STM32_GPIOK_BASE	(AHB1_PERIPH_BASE + 0x2800)
++#define RCC_BASE		(AHB1_PERIPH_BASE + 0x3800)
++#define FLASH_CNTL_BASE		(AHB1_PERIPH_BASE + 0x3C00)
++
++
++#define SDRAM_FMC_BASE		(AHB3_PERIPH_BASE + 0x4A0000140)
++
++enum clock {
++	CLOCK_CORE,
++	CLOCK_AHB,
++	CLOCK_APB1,
++	CLOCK_APB2
++};
++#define STM32_BUS_MASK          0xFFFF0000
++
++int configure_clocks(void);
++
++#endif /* _ASM_ARCH_HARDWARE_H */
+diff --git a/arch/arm/include/asm/arch-stm32f7/stm32_defs.h b/arch/arm/include/asm/arch-stm32f7/stm32_defs.h
+new file mode 100644
+index 0000000..29b98ae
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/stm32_defs.h
+@@ -0,0 +1,15 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __STM32_DEFS_H__
++#define __STM32_DEFS_H__
++#include <asm/arch/stm32_periph.h>
++
++int clock_setup(enum periph_clock);
++
++#endif
++
+diff --git a/arch/arm/include/asm/arch-stm32f7/stm32_periph.h b/arch/arm/include/asm/arch-stm32f7/stm32_periph.h
+new file mode 100644
+index 0000000..38adc4e
+--- /dev/null
++++ b/arch/arm/include/asm/arch-stm32f7/stm32_periph.h
+@@ -0,0 +1,38 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __ASM_ARM_ARCH_PERIPH_H
++#define __ASM_ARM_ARCH_PERIPH_H
++
++/*
++ * Peripherals required for pinmux configuration. List will
++ * grow with support for more devices getting added.
++ * Numbering based on interrupt table.
++ *
++ */
++enum periph_id {
++	UART1_GPIOA_9_10 = 0,
++	UART2_GPIOD_5_6,
++};
++
++enum periph_clock {
++	USART1_CLOCK_CFG = 0,
++	USART2_CLOCK_CFG,
++	GPIO_A_CLOCK_CFG,
++	GPIO_B_CLOCK_CFG,
++	GPIO_C_CLOCK_CFG,
++	GPIO_D_CLOCK_CFG,
++	GPIO_E_CLOCK_CFG,
++	GPIO_F_CLOCK_CFG,
++	GPIO_G_CLOCK_CFG,
++	GPIO_H_CLOCK_CFG,
++	GPIO_I_CLOCK_CFG,
++	GPIO_J_CLOCK_CFG,
++	GPIO_K_CLOCK_CFG,
++};
++
++#endif /* __ASM_ARM_ARCH_PERIPH_H */
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index 7dbeb04..ec6b3ff 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -6,7 +6,11 @@ config STM32F4
+ config STM32F1
+ 	bool "stm32f1 family"
+ 
++config STM32F7
++	bool "stm32f7 family"
++
+ source "arch/arm/mach-stm32/stm32f4/Kconfig"
+ source "arch/arm/mach-stm32/stm32f1/Kconfig"
++source "arch/arm/mach-stm32/stm32f7/Kconfig"
+ 
+ endif
+diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
+index ea06034..ffc537f 100644
+--- a/arch/arm/mach-stm32/Makefile
++++ b/arch/arm/mach-stm32/Makefile
+@@ -7,3 +7,4 @@
+ 
+ obj-$(CONFIG_STM32F1) += stm32f1/
+ obj-$(CONFIG_STM32F4) += stm32f4/
++obj-$(CONFIG_STM32F7) += stm32f7/
+diff --git a/arch/arm/mach-stm32/stm32f7/Kconfig b/arch/arm/mach-stm32/stm32f7/Kconfig
+new file mode 100644
+index 0000000..287e5ad
+--- /dev/null
++++ b/arch/arm/mach-stm32/stm32f7/Kconfig
+@@ -0,0 +1,8 @@
++if STM32F7
++
++config TARGET_STM32F746_DISCO
++	bool "STM32F746 Discovery board"
++
++source "board/st/stm32f746-disco/Kconfig"
++
++endif
+diff --git a/arch/arm/mach-stm32/stm32f7/Makefile b/arch/arm/mach-stm32/stm32f7/Makefile
+new file mode 100644
+index 0000000..40f1ad3
+--- /dev/null
++++ b/arch/arm/mach-stm32/stm32f7/Makefile
+@@ -0,0 +1,8 @@
++#
++# (C) Copyright 2016
++# Vikas Manocha, <vikas.manocha@gmail.com>
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++obj-y += timer.o clock.o
+diff --git a/arch/arm/mach-stm32/stm32f7/clock.c b/arch/arm/mach-stm32/stm32f7/clock.c
+new file mode 100644
+index 0000000..17a715b
+--- /dev/null
++++ b/arch/arm/mach-stm32/stm32f7/clock.c
+@@ -0,0 +1,56 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/io.h>
++#include <asm/arch/rcc.h>
++#include <asm/arch/stm32.h>
++#include <asm/arch/stm32_periph.h>
++
++void clock_setup(int peripheral)
++{
++	switch (peripheral) {
++	case USART1_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_APB2ENR, RCC_ENR_USART1EN);
++		break;
++	case GPIO_A_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_A_EN);
++		break;
++	case GPIO_B_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_B_EN);
++		break;
++	case GPIO_C_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_C_EN);
++		break;
++	case GPIO_D_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_D_EN);
++		break;
++	case GPIO_E_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_E_EN);
++		break;
++	case GPIO_F_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_F_EN);
++		break;
++	case GPIO_G_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_G_EN);
++		break;
++	case GPIO_H_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_H_EN);
++		break;
++	case GPIO_I_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_I_EN);
++		break;
++	case GPIO_J_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_J_EN);
++		break;
++	case GPIO_K_CLOCK_CFG:
++		setbits_le32(RCC_BASE + RCC_AHB1ENR, RCC_ENR_GPIO_K_EN);
++		break;
++	default:
++		break;
++	}
++}
+diff --git a/arch/arm/mach-stm32/stm32f7/timer.c b/arch/arm/mach-stm32/stm32f7/timer.c
+new file mode 100644
+index 0000000..a7dee10
+--- /dev/null
++++ b/arch/arm/mach-stm32/stm32f7/timer.c
+@@ -0,0 +1,112 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/io.h>
++#include <asm/arch/stm32.h>
++#include <asm/arch/gpt.h>
++#include <asm/arch/rcc.h>
++
++#define READ_TIMER()	(readl(&gpt1_regs_ptr->cnt) & GPT_FREE_RUNNING)
++#define GPT_RESOLUTION	(CONFIG_SYS_HZ_CLOCK/CONFIG_STM32_HZ)
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#define timestamp gd->arch.tbl
++#define lastdec gd->arch.lastinc
++
++int timer_init(void)
++{
++	/* Timer2 clock configuration */
++	setbits_le32(RCC_BASE + RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
++	/* Stop the timer */
++	writel(readl(&gpt1_regs_ptr->cr1) & ~GPT_CR1_CEN, &gpt1_regs_ptr->cr1);
++
++	writel((CONFIG_SYS_CLK_FREQ/CONFIG_SYS_HZ_CLOCK) - 1,
++						&gpt1_regs_ptr->psc);
++
++	/* Configure timer for auto-reload */
++	writel(readl(&gpt1_regs_ptr->cr1) | GPT_MODE_AUTO_RELOAD,
++						&gpt1_regs_ptr->cr1);
++
++	/* load value for free running */
++	writel(GPT_FREE_RUNNING, &gpt1_regs_ptr->arr);
++
++	/* start timer */
++	writel(readl(&gpt1_regs_ptr->cr1) | GPT_CR1_CEN, &gpt1_regs_ptr->cr1);
++
++	writel(readl(&gpt1_regs_ptr->egr) | TIM_EGR_UG, &gpt1_regs_ptr->egr);
++
++	/* Reset the timer */
++	lastdec = READ_TIMER();
++	timestamp = 0;
++
++	return 0;
++}
++
++/*
++ * timer without interrupts
++ */
++ulong get_timer(ulong base)
++{
++	return (get_timer_masked() / GPT_RESOLUTION) - base;
++}
++
++void __udelay(unsigned long usec)
++{
++	ulong tmo;
++	ulong start = get_timer_masked();
++	ulong tenudelcnt = CONFIG_SYS_HZ_CLOCK / (1000 * 100);
++	ulong rndoff;
++
++	rndoff = (usec % 10) ? 1 : 0;
++
++	/* tenudelcnt timer tick gives 10 microsecconds delay */
++	tmo = ((usec / 10) + rndoff) * tenudelcnt;
++
++	while ((ulong) (get_timer_masked() - start) < tmo)
++		;
++}
++
++ulong get_timer_masked(void)
++{
++	ulong now = READ_TIMER();
++
++	if (now >= lastdec) {
++		/* normal mode */
++		timestamp += now - lastdec;
++	} else {
++		/* we have an overflow ... */
++		timestamp += now + GPT_FREE_RUNNING - lastdec;
++	}
++	lastdec = now;
++
++	return timestamp;
++}
++
++void udelay_masked(unsigned long usec)
++{
++	return udelay(usec);
++}
++
++/*
++ * This function is derived from PowerPC code (read timebase as long long).
++ * On ARM it just returns the timer value.
++ */
++unsigned long long get_ticks(void)
++{
++	return get_timer(0);
++}
++
++/*
++ * This function is derived from PowerPC code (timebase clock frequency).
++ * On ARM it returns the number of timer ticks per second.
++ */
++ulong get_tbclk(void)
++{
++	return CONFIG_STM32_HZ;
++}
+diff --git a/board/st/stm32f746-disco/Kconfig b/board/st/stm32f746-disco/Kconfig
+new file mode 100644
+index 0000000..09289d2
+--- /dev/null
++++ b/board/st/stm32f746-disco/Kconfig
+@@ -0,0 +1,19 @@
++if TARGET_STM32F746_DISCO
++
++config SYS_BOARD
++	string
++	default "stm32f746-disco"
++
++config SYS_VENDOR
++	string
++	default "st"
++
++config SYS_SOC
++	string
++	default "stm32f7"
++
++config SYS_CONFIG_NAME
++	string
++	default "stm32f746-disco"
++
++endif
+diff --git a/board/st/stm32f746-disco/MAINTAINERS b/board/st/stm32f746-disco/MAINTAINERS
+new file mode 100644
+index 0000000..2df0a65
+--- /dev/null
++++ b/board/st/stm32f746-disco/MAINTAINERS
+@@ -0,0 +1,6 @@
++STM32F746 DISCOVERY BOARD
++M:	Vikas Manocha <vikas.manocha@st.com>
++S:	Maintained
++F:	board/st/stm32f746-disco
++F:	include/configs/stm32f746-disco.h
++F:	configs/stm32f746-disco_defconfig
+diff --git a/board/st/stm32f746-disco/Makefile b/board/st/stm32f746-disco/Makefile
+new file mode 100644
+index 0000000..db8a0a4
+--- /dev/null
++++ b/board/st/stm32f746-disco/Makefile
+@@ -0,0 +1,8 @@
++#
++# (C) Copyright 2016
++# Vikas Manocha <vikas.manocha@st.com>
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++obj-y	:= stm32f746-disco.o
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+new file mode 100644
+index 0000000..0e04d14
+--- /dev/null
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -0,0 +1,99 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/io.h>
++#include <asm/armv7m.h>
++#include <asm/arch/stm32.h>
++#include <asm/arch/gpio.h>
++#include <dm/platdata.h>
++#include <dm/platform_data/serial_stm32x7.h>
++#include <asm/arch/stm32_periph.h>
++#include <asm/arch/stm32_defs.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++const struct stm32_gpio_ctl gpio_ctl_gpout = {
++	.mode = STM32_GPIO_MODE_OUT,
++	.otype = STM32_GPIO_OTYPE_PP,
++	.speed = STM32_GPIO_SPEED_50M,
++	.pupd = STM32_GPIO_PUPD_NO,
++	.af = STM32_GPIO_AF0
++};
++
++const struct stm32_gpio_ctl gpio_ctl_usart = {
++	.mode = STM32_GPIO_MODE_AF,
++	.otype = STM32_GPIO_OTYPE_PP,
++	.speed = STM32_GPIO_SPEED_50M,
++	.pupd = STM32_GPIO_PUPD_UP,
++	.af = STM32_GPIO_AF7
++};
++
++static const struct stm32_gpio_dsc usart_gpio[] = {
++	{STM32_GPIO_PORT_A, STM32_GPIO_PIN_9},	/* TX */
++	{STM32_GPIO_PORT_B, STM32_GPIO_PIN_7},	/* RX */
++};
++
++int uart_setup_gpio(void)
++{
++	int i;
++	int rv = 0;
++
++	clock_setup(GPIO_A_CLOCK_CFG);
++	clock_setup(GPIO_B_CLOCK_CFG);
++	for (i = 0; i < ARRAY_SIZE(usart_gpio); i++) {
++		rv = stm32_gpio_config(&usart_gpio[i], &gpio_ctl_usart);
++		if (rv)
++			goto out;
++	}
++
++out:
++	return rv;
++}
++
++static const struct stm32x7_serial_platdata serial_platdata = {
++	.base = (struct stm32_usart *)USART1_BASE,
++	.clock = CONFIG_SYS_CLK_FREQ,
++};
++
++U_BOOT_DEVICE(stm32x7_serials) = {
++	.name = "serial_stm32x7",
++	.platdata = &serial_platdata,
++};
++
++u32 get_board_rev(void)
++{
++	return 0;
++}
++
++int board_early_init_f(void)
++{
++	int res;
++
++	res = uart_setup_gpio();
++	clock_setup(USART1_CLOCK_CFG);
++	if (res)
++		return res;
++
++	return 0;
++}
++
++int board_init(void)
++{
++	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
++
++	return 0;
++}
++
++int dram_init(void)
++{
++	gd->bd->bi_dram[0].start = CONFIG_SYS_RAM_BASE;
++	gd->bd->bi_dram[0].size  = CONFIG_SYS_RAM_SIZE;
++
++	gd->ram_size = CONFIG_SYS_RAM_SIZE;
++	return 0;
++}
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+new file mode 100644
+index 0000000..7cfed4a
+--- /dev/null
++++ b/configs/stm32f746-disco_defconfig
+@@ -0,0 +1,9 @@
++CONFIG_ARM=y
++CONFIG_STM32=y
++CONFIG_STM32F7=y
++CONFIG_TARGET_STM32F746_DISCO=y
++CONFIG_SYS_PROMPT="U-Boot > "
++CONFIG_AUTOBOOT_KEYED=y
++CONFIG_AUTOBOOT_PROMPT="Hit SPACE in %d seconds to stop autoboot.\n"
++CONFIG_AUTOBOOT_STOP_STR=" "
++# CONFIG_CMD_SETEXPR is not set
+diff --git a/drivers/gpio/stm32_gpio.c b/drivers/gpio/stm32_gpio.c
+index 739de01..50f86d3 100644
+--- a/drivers/gpio/stm32_gpio.c
++++ b/drivers/gpio/stm32_gpio.c
+@@ -19,7 +19,7 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+-#if defined(CONFIG_STM32F4)
++#if defined(CONFIG_STM32F4) || defined(CONFIG_STM32F7)
+ static const unsigned long io_base[] = {
+ 	STM32_GPIOA_BASE, STM32_GPIOB_BASE, STM32_GPIOC_BASE,
+ 	STM32_GPIOD_BASE, STM32_GPIOE_BASE, STM32_GPIOF_BASE,
+@@ -207,7 +207,7 @@ int gpio_direction_input(unsigned gpio)
+ 
+ 	dsc.port = stm32_gpio_to_port(gpio);
+ 	dsc.pin = stm32_gpio_to_pin(gpio);
+-#if defined(CONFIG_STM32F4)
++#if defined(CONFIG_STM32F4) || defined(CONFIG_STM32F7)
+ 	ctl.af = STM32_GPIO_AF0;
+ 	ctl.mode = STM32_GPIO_MODE_IN;
+ 	ctl.otype = STM32_GPIO_OTYPE_PP;
+@@ -233,7 +233,7 @@ int gpio_direction_output(unsigned gpio, int value)
+ 
+ 	dsc.port = stm32_gpio_to_port(gpio);
+ 	dsc.pin = stm32_gpio_to_pin(gpio);
+-#if defined(CONFIG_STM32F4)
++#if defined(CONFIG_STM32F4) || defined(CONFIG_STM32F7)
+ 	ctl.af = STM32_GPIO_AF0;
+ 	ctl.mode = STM32_GPIO_MODE_OUT;
+ 	ctl.pupd = STM32_GPIO_PUPD_NO;
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+new file mode 100644
+index 0000000..e1b8bcb
+--- /dev/null
++++ b/include/configs/stm32f746-disco.h
+@@ -0,0 +1,89 @@
++/*
++ * (C) Copyright 2016
++ * Vikas Manocha, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __CONFIG_H
++#define __CONFIG_H
++
++#define CONFIG_SYS_THUMB_BUILD
++#define CONFIG_SYS_NO_FLASH
++
++#define CONFIG_OF_LIBFDT
++#define CONFIG_BOARD_EARLY_INIT_F
++
++#define CONFIG_SYS_FLASH_BASE		0x08000000
++#define CONFIG_SYS_INIT_SP_ADDR		0x20050000
++#define CONFIG_SYS_TEXT_BASE		0x08000000
++
++#define CONFIG_SYS_ICACHE_OFF
++#define CONFIG_SYS_DCACHE_OFF
++
++/*
++ * Configuration of the external SDRAM memory
++ */
++#define CONFIG_NR_DRAM_BANKS		1
++#define CONFIG_SYS_RAM_SIZE		((64 + 192) << 10)
++#define CONFIG_SYS_RAM_CS		1
++#define CONFIG_SYS_RAM_FREQ_DIV		2
++#define CONFIG_SYS_RAM_BASE		0x20000000
++#define CONFIG_SYS_SDRAM_BASE		CONFIG_SYS_RAM_BASE
++#define CONFIG_SYS_LOAD_ADDR		0x20000000
++#define CONFIG_LOADADDR			0x20000000
++
++#define CONFIG_SYS_MAX_FLASH_SECT	12
++#define CONFIG_SYS_MAX_FLASH_BANKS	2
++
++#ifndef CONFIG_SYS_NO_FLASH
++#define CONFIG_ENV_IS_IN_FLASH
++#else
++#define CONFIG_ENV_IS_NOWHERE
++#endif
++#define CONFIG_ENV_SIZE			(8 << 10)
++
++#define CONFIG_STM32_GPIO
++#define CONFIG_STM32X7_SERIAL
++
++#define CONFIG_SYS_CLK_FREQ		16*1000*1000 /* 180 MHz */
++#define CONFIG_SYS_HZ_CLOCK		1000000	/* Timer is clocked at 1MHz */
++
++#define CONFIG_CMDLINE_TAG
++#define CONFIG_SETUP_MEMORY_TAGS
++#define CONFIG_INITRD_TAG
++#define CONFIG_REVISION_TAG
++
++#define CONFIG_SYS_CBSIZE		1024
++#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE \
++					+ sizeof(CONFIG_SYS_PROMPT) + 16)
++
++#define CONFIG_SYS_MAXARGS		16
++#define CONFIG_SYS_MALLOC_LEN		(16 * 1024)
++#define CONFIG_STACKSIZE		(64 << 10)
++
++#define CONFIG_BAUDRATE			115200
++#define CONFIG_BOOTARGS							\
++	"console=ttyS0,115200 earlyprintk consoleblank=0 ignore_loglevel"
++#define CONFIG_BOOTCOMMAND						\
++	"run bootcmd_romfs"
++
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	"bootargs_romfs=uclinux.physaddr=0x08180000 root=/dev/mtdblock0\0" \
++	"bootcmd_romfs=setenv bootargs ${bootargs} ${bootargs_romfs};" \
++	"bootm 0x08044000 - 0x08042000\0"
++
++#define CONFIG_BOOTDELAY		3
++
++/*
++ * Command line configuration.
++ */
++#define CONFIG_SYS_LONGHELP
++#define CONFIG_SYS_HUSH_PARSER
++#define CONFIG_AUTO_COMPLETE
++#define CONFIG_CMDLINE_EDITING
++
++#define CONFIG_CMD_MEM
++#define CONFIG_CMD_TIMER
++#undef CONFIG_CMD_IMLS
++#endif /* __CONFIG_H */
+-- 
+1.9.1
+

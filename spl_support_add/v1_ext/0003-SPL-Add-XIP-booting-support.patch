@@ -1,0 +1,120 @@
+From 75ca348c2e9f35c73cf396fa8fb5127b3e1a8915 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 7 Apr 2017 10:32:07 -0700
+Subject: [PATCH 3/6] SPL: Add XIP booting support
+Cc: patrick.delaunay@st.com,
+    patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+Enable support for XIP (execute in place) of U-Boot or kernel image. There is
+no need to copy image from flash to ram if flash supports execute in place.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/spl.h                 |  1 +
+ board/st/stm32f746-disco/stm32f746-disco.c |  1 +
+ common/spl/Kconfig                         |  9 +++++++++
+ common/spl/Makefile                        |  1 +
+ common/spl/spl_xip.c                       | 31 ++++++++++++++++++++++++++++++
+ 5 files changed, 43 insertions(+)
+ create mode 100644 common/spl/spl_xip.c
+
+diff --git a/arch/arm/include/asm/spl.h b/arch/arm/include/asm/spl.h
+index a0bda28..0a3536b 100644
+--- a/arch/arm/include/asm/spl.h
++++ b/arch/arm/include/asm/spl.h
+@@ -29,6 +29,7 @@ enum {
+ 	BOOT_DEVICE_I2C,
+ 	BOOT_DEVICE_BOARD,
+ 	BOOT_DEVICE_DFU,
++	BOOT_DEVICE_XIP,
+ 	BOOT_DEVICE_NONE
+ };
+ #endif
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 4f2b677..e330b1f 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -91,6 +91,7 @@ int board_early_init_f(void)
+ #endif
+ 
+ #ifdef CONFIG_SPL_BUILD
++
+ int spl_dram_init(void)
+ {
+ 	struct udevice *dev;
+diff --git a/common/spl/Kconfig b/common/spl/Kconfig
+index f51ae2c..52a5271 100644
+--- a/common/spl/Kconfig
++++ b/common/spl/Kconfig
+@@ -459,6 +459,15 @@ config SPL_NOR_SUPPORT
+ 	  a memory-mapped device makes it very easy to access. Loading from
+ 	  NOR is typically achieved with just a memcpy().
+ 
++config SPL_XIP_SUPPORT
++	bool "Support XIP"
++	depends on SPL
++	help
++	  Enable support for execute in place of U-Boot or kernel image. There
++	  is no need to copy image from flash to ram if flash supports execute
++	  in place. Its very useful in systems having enough flash but not
++	  enough ram to load the image.
++
+ config SPL_ONENAND_SUPPORT
+ 	bool "Support OneNAND flash"
+ 	depends on SPL
+diff --git a/common/spl/Makefile b/common/spl/Makefile
+index 1933cbd..88deeaf 100644
+--- a/common/spl/Makefile
++++ b/common/spl/Makefile
+@@ -12,6 +12,7 @@ ifdef CONFIG_SPL_BUILD
+ obj-$(CONFIG_SPL_FRAMEWORK) += spl.o
+ obj-$(CONFIG_SPL_LOAD_FIT) += spl_fit.o
+ obj-$(CONFIG_SPL_NOR_SUPPORT) += spl_nor.o
++obj-$(CONFIG_SPL_XIP_SUPPORT) += spl_xip.o
+ obj-$(CONFIG_SPL_YMODEM_SUPPORT) += spl_ymodem.o
+ ifndef CONFIG_SPL_UBI
+ obj-$(CONFIG_SPL_NAND_SUPPORT) += spl_nand.o
+diff --git a/common/spl/spl_xip.c b/common/spl/spl_xip.c
+new file mode 100644
+index 0000000..50e2f34
+--- /dev/null
++++ b/common/spl/spl_xip.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2017 Vikas Manocha <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <spl.h>
++
++static int spl_xip(struct spl_image_info *spl_image,
++		   struct spl_boot_device *bootdev)
++{
++#ifdef CONFIG_SPL_OS_BOOT
++	if (!spl_start_uboot()) {
++		spl_image->arg = (void *)CONFIG_SYS_FDT_BASE;
++		spl_image->name = "Linux";
++		spl_image->os = IH_OS_LINUX;
++		spl_image->load_addr = CONFIG_SYS_LOAD_ADDR;
++		spl_image->entry_point = CONFIG_SYS_LOAD_ADDR;
++#ifdef CONFIG_CPU_V7M
++		spl_image->entry_point |= 0x1;
++#endif
++		debug("spl: payload xipImage, load addr: 0x%lx\n",
++		      spl_image->load_addr);
++		return 0;
++	}
++#endif
++	return(spl_parse_image_header(spl_image, (const struct image_header *)
++	       CONFIG_SYS_UBOOT_BASE));
++}
++SPL_LOAD_IMAGE_METHOD("XIP", 0, BOOT_DEVICE_XIP, spl_xip);
+-- 
+1.9.1
+

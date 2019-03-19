@@ -1,0 +1,26 @@
+From 01a7c9db854959ede5a6be7cbc33fdf21f9ed436 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 28 Apr 2017 15:13:15 -0700
+Subject: [U-BOOT INTERNAL REVIEW 0/4] add armv7m mpu support
+
+This patchset adds armv7m mpu support & uses it for stm32 micros.
+
+Vikas Manocha (4):
+  armv7m: correct mpu region size define for 8MB size
+  armv7m: add MPU configuration support
+  stm32: use armv7m MPU configuration support
+  stm32f7: configure mpu valid for f7 family
+
+ arch/arm/cpu/armv7m/Makefile      |  2 +-
+ arch/arm/cpu/armv7m/mpu.c         | 78 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/armv7m.h     | 19 ----------
+ arch/arm/include/asm/armv7m_mpu.h | 67 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-stm32/stm32f4/soc.c | 16 ++++----
+ arch/arm/mach-stm32/stm32f7/soc.c | 63 +++++++++----------------------
+ 6 files changed, 172 insertions(+), 73 deletions(-)
+ create mode 100644 arch/arm/cpu/armv7m/mpu.c
+ create mode 100644 arch/arm/include/asm/armv7m_mpu.h
+
+-- 
+1.9.1
+

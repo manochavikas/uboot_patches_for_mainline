@@ -1,0 +1,51 @@
+From 03a5a0990654aaa0097fe5e72a58a72449894c7e Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 13 Mar 2017 11:51:44 -0700
+Subject: [PATCH 4/4] stm32f7: configure mpu valid for f7 family
+
+This configuration should be valid for all F7 family devices in general.
+Here is the regions info:
+
+	- Region0 : 4GB	  : cacheable & executable.
+	- Region1 : 512MB : text area	: strogly ordered & executable.
+	- Region2 : 512MB : peripherals : device memory & non-executable.
+	- Region3 : 512MB : peripherals : device memory & non-executable.
+	- Region4 : 512MB : cortexM area: strongly ordered & non-executable.
+
+Higher region number overrides the lower region configuration.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/mach-stm32/stm32f7/soc.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-stm32/stm32f7/soc.c b/arch/arm/mach-stm32/stm32f7/soc.c
+index 3586133..74a9350 100644
+--- a/arch/arm/mach-stm32/stm32f7/soc.c
++++ b/arch/arm/mach-stm32/stm32f7/soc.c
+@@ -19,10 +19,19 @@ int arch_cpu_init(void)
+ {
+ 	struct mpu_region_config stm32_region_config[] = {
+ 		{ 0x00000000, REGION_0, XN_DIS, PRIV_RW_USR_RW,
+-		STRONG_ORDER, REGION_4GB },
++		O_I_WB_RD_WR_ALLOC, REGION_4GB },
+ 
+-		{ 0xC0000000, REGION_1, XN_DIS, PRIV_RW_USR_RW,
+-		O_I_WB_RD_WR_ALLOC, REGION_8MB },
++		{ 0x00000000, REGION_1, XN_DIS, PRIV_RW_USR_RW,
++		STRONG_ORDER, REGION_512MB },
++
++		{ 0x40000000, REGION_2, XN_EN, PRIV_RW_USR_RW,
++		DEVICE_NON_SHARED, REGION_512MB },
++
++		{ 0xA0000000, REGION_3, XN_EN, PRIV_RW_USR_RW,
++		DEVICE_NON_SHARED, REGION_512MB },
++
++		{ 0xE0000000, REGION_4, XN_EN, PRIV_RW_USR_RW,
++		STRONG_ORDER, REGION_512MB },
+ 	};
+ 
+ 	disable_mpu();
+-- 
+1.9.1
+

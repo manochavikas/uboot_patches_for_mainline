@@ -1,0 +1,33 @@
+From d6bb7a99629073fc8574421642eab47ff2e1292c Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Mar 2017 14:29:47 -0700
+Subject: [PATCH] dm: avoid dropping pin control DT properties in case of
+ SPL_PINCTRL
+
+This patch replaces SPL_PINCTRL_FULL with SPL_PINCNTRL. It is to avoid removal
+of pin control properties in case of SPL_PINCTRL. No impact in case of
+SPL_PINCTRL_FULL as it depends on SPL_PINCTRL.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ dts/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/dts/Kconfig b/dts/Kconfig
+index 4b7d8b1..2374e62 100644
+--- a/dts/Kconfig
++++ b/dts/Kconfig
+@@ -73,8 +73,8 @@ config OF_LIST
+ config OF_SPL_REMOVE_PROPS
+ 	string "List of device tree properties to drop for SPL"
+ 	depends on SPL_OF_CONTROL
+-	default "interrupt-parent" if SPL_PINCTRL_FULL && SPL_CLK
+-	default "clocks clock-names interrupt-parent" if SPL_PINCTRL_FULL
++	default "interrupt-parent" if SPL_PINCTRL && SPL_CLK
++	default "clocks clock-names interrupt-parent" if SPL_PINCTRL
+ 	default "pinctrl-0 pinctrl-names interrupt-parent" if SPL_CLK
+ 	default "pinctrl-0 pinctrl-names clocks clock-names interrupt-parent"
+ 	help
+-- 
+1.9.1
+

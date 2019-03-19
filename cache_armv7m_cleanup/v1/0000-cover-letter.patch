@@ -1,0 +1,21 @@
+From 8fee1aceeb869389e0e68a5d4449b3f43b4e956a Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 3 May 2017 15:43:21 -0700
+Subject: [PATCH 0/2] armv7m: cache: cleanup before linux booting
+
+This patchset:
+	- add all data cache flushing & invalidation functions as
+	declared in the common header file.
+	- adds cleanup before linux booting.
+
+Vikas Manocha (2):
+  armv7m: cache: add flush & invalidate all dcache
+  arvm7m: add cleanup before linux booting
+
+ arch/arm/cpu/armv7m/cache.c | 15 +++++++++++++++
+ arch/arm/cpu/armv7m/cpu.c   | 19 +++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+
+-- 
+1.9.1
+

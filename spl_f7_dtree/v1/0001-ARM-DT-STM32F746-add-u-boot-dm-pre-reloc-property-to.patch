@@ -1,0 +1,63 @@
+From 7514762f555ad63cbd02fd25c4bf590a8ba2126f Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Mar 2017 13:59:03 -0700
+Subject: [PATCH] ARM: DT: STM32F746: add u-boot,dm-pre-reloc property to sub
+ nodes
+
+This patch is required for correct SPL device tree creation by fdtgrep
+as fdtgrep looks for u-boot,dm-pre-reloc property of the node to include
+it in the spl device tree.
+
+Not adding it in these subnodes ignores the pin muxing of peripherals
+which is almost always in the subnodes.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/dts/stm32f746-disco.dts | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/stm32f746-disco.dts b/arch/arm/dts/stm32f746-disco.dts
+index 2c7fa79..30c92ef 100644
+--- a/arch/arm/dts/stm32f746-disco.dts
++++ b/arch/arm/dts/stm32f746-disco.dts
+@@ -96,15 +96,18 @@
+ 
+ &pinctrl {
+ 	usart1_pins_a: usart1@0	{
++		u-boot,dm-pre-reloc;
+ 		pins1 {
+-		       pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
++			pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
+ 				bias-disable;
+ 				drive-push-pull;
+ 				slew-rate = <2>;
++			u-boot,dm-pre-reloc;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32F746_PB7_FUNC_USART1_RX>;
+ 			bias-disable;
++			u-boot,dm-pre-reloc;
+ 		};
+ 	};
+ 
+@@ -136,7 +139,9 @@
+ 	};
+ 
+ 	fmc_pins: fmc@0 {
++			u-boot,dm-pre-reloc;
+ 		pins {
++			u-boot,dm-pre-reloc;
+ 			pinmux = <STM32F746_PD10_FUNC_FMC_D15>,
+ 				 <STM32F746_PD9_FUNC_FMC_D14>,
+ 				 <STM32F746_PD8_FUNC_FMC_D13>,
+@@ -198,6 +203,7 @@
+ 	mr-nbanks = <1>;
+ 	/* Memory configuration from sdram datasheet MT48LC_4M32_B2B5-6A */
+ 	bank1: bank@0 {
++	       u-boot,dm-pre-reloc;
+ 	       st,sdram-control = /bits/ 8 <NO_COL_8 NO_ROW_12 MWIDTH_16 BANKS_4
+ 	       				    CAS_3 SDCLK_2 RD_BURST_EN
+ 					    RD_PIPE_DL_0>;
+-- 
+1.9.1
+

@@ -1,0 +1,77 @@
+From f40327e027a5b26c579934e1ba1cd7dec9be79b1 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 10 Apr 2017 14:49:30 -0700
+Subject: [PATCH v4 00/18] stm32f7: add sdram & gpio drivers
+
+This patchset :
+	- adds stm32 sdram driver based on DM
+	- adds stm32 gpio driver based on DM
+	- uses clock & pin control drivers to replace board specific
+	  configurations from code
+	- corrects sdram parameters as per correct sdram part
+	- adds support for stm32f769 board
+
+Changed in v4:
+- rebased to master.
+
+Changed in v3:
+- made stm32_gpio_config() static.
+- moved common.h inclusion before clk.h
+
+Changed in v2:
+- included files in correct order.
+- moved the pinctrl specific routine from gpio driver to pinctrl
+- used dev_get_addr() instead of fdtdec_get_addr_size_auto_parent() in
+  gpio driver.
+- pointed gpio name to bank name in device tree blob rather than copy.
+
+Vikas Manocha (18):
+  stm32f7: use clock driver to enable qspi controller clock
+  stm32f7: sdram: move sdram driver code to ram drivers area
+  stm32f7: dm: add driver model support for sdram
+  ARM: DT: stm32f7: add sdram pin contol node
+  stm32f7: use driver model for sdram initialization
+  stm32f7: use clock driver to enable sdram controller clock
+  stm32f7: sdram: use sdram device tree node to configure sdram
+    controller
+  dm: gpio: Add driver for stm32f7 gpio controller
+  ARM: DT: stm32f7: add gpio device tree nodes
+  stm32f7: use stm32f7 gpio driver supporting driver model
+  stm32f746: to switch on user LED1 & read user button
+  stm32f7: stm32f746-disco: read memory info from device tree
+  stm32f7: enable board info read from device tree
+  stm32f7: sdram: correct sdram configuration as per micron sdram
+  stm32f7: increase the max no of pin configuration to 70
+  stm32f7: move board specific pin muxing to dts
+  stm32f7: add support for stm32f769 disco board
+  stm32f7: remove not needed configuration from board config
+
+ arch/arm/dts/Makefile                         |   3 +-
+ arch/arm/dts/stm32f746-disco.dts              | 132 ++++++++++++
+ arch/arm/dts/stm32f746.dtsi                   | 151 ++++++++++---
+ arch/arm/dts/stm32f769-disco.dts              | 255 ++++++++++++++++++++++
+ arch/arm/include/asm/arch-stm32f7/gpio.h      |  21 +-
+ board/st/stm32f746-disco/stm32f746-disco.c    | 299 ++++++--------------------
+ configs/stm32f746-disco_defconfig             |   6 +
+ doc/device-tree-bindings/ram/st,stm32-fmc.txt |  51 +++++
+ drivers/clk/clk_stm32f7.c                     |  39 ----
+ drivers/gpio/Kconfig                          |   9 +
+ drivers/gpio/Makefile                         |   1 +
+ drivers/gpio/stm32f7_gpio.c                   | 135 ++++++++++++
+ drivers/pinctrl/pinctrl_stm32.c               |  50 ++++-
+ drivers/ram/Kconfig                           |   8 +
+ drivers/ram/Makefile                          |   1 +
+ drivers/ram/stm32_sdram.c                     | 179 +++++++++++++++
+ drivers/spi/stm32_qspi.c                      |  16 +-
+ include/configs/stm32f746-disco.h             |  11 +-
+ include/dt-bindings/memory/stm32-sdram.h      |  37 ++++
+ 19 files changed, 1076 insertions(+), 328 deletions(-)
+ create mode 100644 arch/arm/dts/stm32f769-disco.dts
+ create mode 100644 doc/device-tree-bindings/ram/st,stm32-fmc.txt
+ create mode 100644 drivers/gpio/stm32f7_gpio.c
+ create mode 100644 drivers/ram/stm32_sdram.c
+ create mode 100644 include/dt-bindings/memory/stm32-sdram.h
+
+-- 
+1.9.1
+

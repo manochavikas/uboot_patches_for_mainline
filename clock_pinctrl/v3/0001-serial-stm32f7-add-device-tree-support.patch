@@ -1,0 +1,85 @@
+From 40ee740f38678798c755746422daf1d1f27a0bcc Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 24 Jan 2017 14:04:09 -0800
+Subject: [PATCH v3 01/10] serial: stm32f7: add device tree support
+
+This patch adds device tree support for stm32f7 serial driver & removes serial
+platform data structure.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+Reviewed-by: Simon Glass <sjg@chromium.org>
+---
+
+Changed in v3: None
+Changed in v2: None
+
+ board/st/stm32f746-disco/stm32f746-disco.c | 10 ----------
+ drivers/serial/serial_stm32x7.c            | 24 ++++++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 10 deletions(-)
+
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 7ed7bf7..72212f4 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -267,16 +267,6 @@ out:
+ 	return rv;
+ }
+ 
+-static const struct stm32x7_serial_platdata serial_platdata = {
+-	.base = (struct stm32_usart *)USART1_BASE,
+-	.clock = CONFIG_SYS_CLK_FREQ,
+-};
+-
+-U_BOOT_DEVICE(stm32x7_serials) = {
+-	.name = "serial_stm32x7",
+-	.platdata = &serial_platdata,
+-};
+-
+ #ifdef CONFIG_ETH_DESIGNWARE
+ const struct stm32_gpio_ctl gpio_ctl_eth = {
+ 	.mode = STM32_GPIO_MODE_AF,
+diff --git a/drivers/serial/serial_stm32x7.c b/drivers/serial/serial_stm32x7.c
+index 592c0bd..2e6c676 100644
+--- a/drivers/serial/serial_stm32x7.c
++++ b/drivers/serial/serial_stm32x7.c
+@@ -81,6 +81,27 @@ static int stm32_serial_probe(struct udevice *dev)
+ 	return 0;
+ }
+ 
++#if CONFIG_IS_ENABLED(OF_CONTROL)
++static const struct udevice_id stm32_serial_id[] = {
++	{.compatible = "st,stm32-usart"},
++	{.compatible = "st,stm32-uart"},
++	{}
++};
++
++static int stm32_serial_ofdata_to_platdata(struct udevice *dev)
++{
++	struct stm32x7_serial_platdata *plat = dev_get_platdata(dev);
++	fdt_addr_t addr;
++
++	addr = dev_get_addr(dev);
++	if (addr == FDT_ADDR_T_NONE)
++		return -EINVAL;
++
++	plat->base = (struct stm32_usart *)addr;
++	return 0;
++}
++#endif
++
+ static const struct dm_serial_ops stm32_serial_ops = {
+ 	.putc = stm32_serial_putc,
+ 	.pending = stm32_serial_pending,
+@@ -91,6 +112,9 @@ static const struct dm_serial_ops stm32_serial_ops = {
+ U_BOOT_DRIVER(serial_stm32) = {
+ 	.name = "serial_stm32x7",
+ 	.id = UCLASS_SERIAL,
++	.of_match = of_match_ptr(stm32_serial_id),
++	.ofdata_to_platdata = of_match_ptr(stm32_serial_ofdata_to_platdata),
++	.platdata_auto_alloc_size = sizeof(struct stm32x7_serial_platdata),
+ 	.ops = &stm32_serial_ops,
+ 	.probe = stm32_serial_probe,
+ 	.flags = DM_FLAG_PRE_RELOC,
+-- 
+1.9.1
+

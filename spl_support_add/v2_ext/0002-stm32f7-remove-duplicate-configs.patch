@@ -1,0 +1,36 @@
+From ca07ab80ac6143405316f9ee66ab7d85f60e5164 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 16 May 2017 16:51:51 -0700
+Subject: [PATCH v2 2/7] stm32f7: remove duplicate configs
+Cc: patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: None
+
+ configs/stm32f746-disco_defconfig | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+index 4322aad..a334d50 100644
+--- a/configs/stm32f746-disco_defconfig
++++ b/configs/stm32f746-disco_defconfig
+@@ -44,10 +44,6 @@ CONFIG_DM_SPI=y
+ CONFIG_STM32_QSPI=y
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ # CONFIG_EFI_LOADER is not set
+-CONFIG_CLK=y
+-CONFIG_PINCTRL=y
+-# CONFIG_PINCTRL_FULL is not set
+-CONFIG_PINCTRL_STM32=y
+ CONFIG_RAM=y
+ CONFIG_STM32_SDRAM=y
+ CONFIG_DM_GPIO=y
+-- 
+1.9.1
+

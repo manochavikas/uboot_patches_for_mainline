@@ -1,0 +1,386 @@
+From 9b86a08479a18bcb361664e8e9d208b62c74dec1 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Sun, 5 Mar 2017 14:45:57 -0800
+Subject: [PATCH 1/2] armv7m: add instruction & data cache support
+
+This patch adds armv7m instruction & data cache support.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/cpu/armv7m/Makefile  |   2 +-
+ arch/arm/cpu/armv7m/cache.c   | 295 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/armv7m.h |  23 +++-
+ arch/arm/lib/Makefile         |   2 +
+ 4 files changed, 319 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/cpu/armv7m/cache.c
+
+diff --git a/arch/arm/cpu/armv7m/Makefile b/arch/arm/cpu/armv7m/Makefile
+index aff60e8..41efe11 100644
+--- a/arch/arm/cpu/armv7m/Makefile
++++ b/arch/arm/cpu/armv7m/Makefile
+@@ -6,4 +6,4 @@
+ #
+ 
+ extra-y := start.o
+-obj-y += cpu.o
++obj-y += cpu.o cache.o
+diff --git a/arch/arm/cpu/armv7m/cache.c b/arch/arm/cpu/armv7m/cache.c
+new file mode 100644
+index 0000000..0fded33
+--- /dev/null
++++ b/arch/arm/cpu/armv7m/cache.c
+@@ -0,0 +1,295 @@
++/*
++ * (C) Copyright 2017
++ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/armv7m.h>
++#include <asm/io.h>
++#include <errno.h>
++
++struct v7m_cache {
++	uint32_t ic_iallu;	/* offset 0x0*/
++	uint32_t res;		/* offset 0x4*/
++	uint32_t ic_imvalu;	/* offset 0x8*/
++	uint32_t dc_imvac;	/* offset 0xc*/
++	uint32_t dc_isw;	/* offset 0x10*/
++	uint32_t dc_cmvau;	/* offset 0x14*/
++	uint32_t dc_cmvac;	/* offset 0x18*/
++	uint32_t dc_csw;	/* offset 0x1c*/
++	uint32_t dc_cimvac;	/* offset 0x20*/
++	uint32_t dc_cisw;	/* offset 0x24*/
++	uint32_t bp_iall;	/* offset 0x28*/
++};
++
++struct v7m_proc_features {
++	uint32_t clidr;		/* offset 0x00 */
++	uint32_t ctr;		/* offset 0x04 */
++	uint32_t ccsidr;	/* offset 0x08 */
++	uint32_t csselr;	/* offset 0x0c */
++};
++
++struct v7m_cache *const v7m_cache_maint = (void *)V7M_CACHE_MAINT_BASE;
++struct v7m_proc_features *const v7m_processor = (void *)V7M_PROC_FTR_BASE;
++
++#define WAYS_SHIFT		30
++#define SETS_SHIFT		5
++
++enum cache_type {
++	DCACHE = 0,
++	ICACHE,
++};
++
++/* PoU : Point of Unification, Poc: Point of Coherency */
++enum cache_action {
++	INVALIDATE_POU,		/* for i-cache invalidate by address */
++	INVALIDATE_POC,		/* for d-cache invalidate by address */
++	INVALIDATE_SET_WAY,	/* for d-cache invalidate by sets/ways */
++	FLUSH_POU,
++	FLUSH_POC,
++	FLUSH_SET_WAY,
++	FLUSH_INVAL_POC,
++	FLUSH_INVAL_SET_WAY,
++};
++
++#ifndef CONFIG_SYS_DCACHE_OFF
++struct dcache_config {
++	uint32_t ways;
++	uint32_t sets;
++};
++
++static void get_cache_ways_sets(struct dcache_config *cache)
++{
++	cache->ways = (readl(&v7m_processor->ccsidr) & GENMASK(12, 3)) >> 3;
++	cache->sets = (readl(&v7m_processor->ccsidr) & GENMASK(27, 13)) >> 13;
++}
++
++static uint32_t *get_action_reg_set_ways(enum cache_action action)
++{
++	uint32_t *action_reg;
++
++	switch (action) {
++	case INVALIDATE_SET_WAY:
++		action_reg = &v7m_cache_maint->dc_isw;
++		break;
++	case FLUSH_SET_WAY:
++		action_reg = &v7m_cache_maint->dc_csw;
++		break;
++	case FLUSH_INVAL_SET_WAY:
++		action_reg = &v7m_cache_maint->dc_cisw;
++		break;
++	default:
++		action_reg = NULL;
++		break;
++	};
++
++	return action_reg;
++}
++
++static uint32_t *get_action_reg_range(enum cache_action action)
++{
++	uint32_t *action_reg;
++
++	switch (action) {
++	case INVALIDATE_POU:
++		action_reg = &v7m_cache_maint->ic_imvalu;
++		break;
++	case INVALIDATE_POC:
++		action_reg = &v7m_cache_maint->dc_imvac;
++		break;
++	case FLUSH_POU:
++		action_reg = &v7m_cache_maint->dc_cmvau;
++		break;
++	case FLUSH_POC:
++		action_reg = &v7m_cache_maint->dc_cmvac;
++		break;
++	case FLUSH_INVAL_POC:
++		action_reg = &v7m_cache_maint->dc_cimvac;
++		break;
++	default:
++		action_reg = NULL;
++		break;
++	}
++
++	return action_reg;
++}
++
++static uint32_t get_cline_size(enum cache_type type)
++{
++	uint32_t size;
++
++	if (type == DCACHE)
++		clrbits_le32(v7m_processor->csselr, BIT(0));
++	else if (type == ICACHE)
++		clrbits_le32(v7m_processor->csselr, BIT(1));
++	dsb();
++
++	size = (readl(&v7m_processor->ccsidr) & GENMASK(2, 0));
++	size = size * 4 + 4; /* 0 means 4, 1 means 8 & so on */
++	debug("cache line size is %d\n", size);
++
++	return size;
++}
++
++int action_cache_range(enum cache_action action, uint32_t start_addr,
++		       int64_t size)
++{
++	uint32_t cline_size;
++	uint32_t *action_reg;
++	enum cache_type type;
++
++	action_reg = get_action_reg_range(action);
++	if (!action_reg)
++		return -EINVAL;
++	if (action == INVALIDATE_POU)
++		type = ICACHE;
++	else
++		type = DCACHE;
++
++	/* cache line size is minium size for the cache action */
++	cline_size = get_cline_size(type);
++	do {
++		writel(start_addr, action_reg);
++		size -= cline_size;
++		start_addr += cline_size;
++	} while (size > cline_size);
++	debug("cache action on range done\n");
++	dsb();
++	isb();
++
++	return 0;
++}
++
++static int action_dcache_all(enum cache_action action)
++{
++	struct dcache_config cache;
++	uint32_t *action_reg;
++	int i, j;
++
++	action_reg = get_action_reg_set_ways(action);
++	if (!action_reg)
++		return -EINVAL;
++
++	clrbits_le32(v7m_processor->csselr, BIT(0));	/* select data cache */
++	dsb();
++	get_cache_ways_sets(&cache);	/* Get number of ways & sets */
++	debug("cache: ways= %d, sets= %d\n", cache.ways + 1, cache.sets + 1);
++	for (i = cache.sets; i >= 0; i--) {
++		for (j = cache.ways; j >= 0; j--) {
++			writel((j << WAYS_SHIFT) | (i << SETS_SHIFT),
++			       action_reg);
++		}
++	}
++	dsb();
++	isb();
++
++	return 0;
++}
++
++void dcache_enable(void)
++{
++	if (dcache_status())	/* return if cache already enabled */
++		return;
++	if (action_dcache_all(INVALIDATE_SET_WAY)) {
++		printf("ERR: D-cache not enabled\n");
++		return;
++	}
++	setbits_le32(&V7M_SCB->ccr, BIT(16));
++	dsb();
++	isb();
++}
++
++void dcache_disable(void)
++{
++	/* if dcache is enabled-> dcache disable & then flush */
++	if (dcache_status()) {
++		if (action_dcache_all(FLUSH_SET_WAY)) {
++			printf("ERR: D-cahe not flushed\n");
++			return;
++		}
++		clrbits_le32(&V7M_SCB->ccr, BIT(16));
++		dsb();
++		isb();
++	}
++}
++
++int dcache_status(void)
++{
++	return (readl(&V7M_SCB->ccr) & BIT(16)) != 0;
++}
++
++#else
++void dcache_enable(void)
++{
++	return;
++}
++
++void dcache_disable(void)
++{
++	return;
++}
++
++int dcache_status(void)
++{
++	return 0;
++}
++#endif
++
++#ifndef CONFIG_SYS_ICACHE_OFF
++
++void invalidate_icache_all(void)
++{
++	writel(0, &v7m_cache_maint->ic_iallu);
++	dsb();
++	isb();
++}
++
++void icache_enable(void)
++{
++	if (icache_status())
++		return;
++	invalidate_icache_all();
++	setbits_le32(&V7M_SCB->ccr, BIT(17));
++	dsb();
++	isb();
++}
++
++int icache_status(void)
++{
++	return (readl(&V7M_SCB->ccr) & BIT(17)) != 0;
++}
++
++void icache_disable(void)
++{
++	isb();
++	clrbits_le32(&V7M_SCB->ccr, BIT(17));
++	isb();
++}
++#else
++void icache_enable(void)
++{
++	return;
++}
++
++void icache_disable(void)
++{
++	return;
++}
++
++int icache_status(void)
++{
++	return 0;
++}
++#endif
++
++void enable_caches(void)
++{
++#ifndef CONFIG_SYS_ICACHE_OFF
++	icache_enable();
++#endif
++#ifndef CONFIG_SYS_DCACHE_OFF
++	dcache_enable();
++#endif
++}
+diff --git a/arch/arm/include/asm/armv7m.h b/arch/arm/include/asm/armv7m.h
+index 54d8a2b..9b3d73d 100644
+--- a/arch/arm/include/asm/armv7m.h
++++ b/arch/arm/include/asm/armv7m.h
+@@ -16,8 +16,15 @@
+ .thumb
+ #endif
+ 
+-#define V7M_SCB_BASE		0xE000ED00
+-#define V7M_MPU_BASE		0xE000ED90
++/* armv7m fixed base addresses */
++#define V7M_SCS_BASE		(0xE000E000)
++#define V7M_NVIC_BASE		(V7M_SCS_BASE + 0x0100)
++#define V7M_SCB_BASE		(V7M_SCS_BASE + 0x0D00)
++#define V7M_PROC_FTR_BASE	(V7M_SCS_BASE + 0x0D78)
++#define V7M_MPU_BASE		(V7M_SCS_BASE + 0x0D90)
++#define V7M_FPU_BASE		(V7M_SCS_BASE + 0x0F30)
++#define V7M_CACHE_MAINT_BASE	(V7M_SCS_BASE + 0x0F50)
++#define V7M_ACCESS_CNTL_BASE	(V7M_SCS_BASE + 0x0F90)
+ 
+ #define V7M_SCB_VTOR		0x08
+ 
+@@ -27,6 +34,18 @@ struct v7m_scb {
+ 	uint32_t icsr;		/* Interrupt Control and State Register */
+ 	uint32_t vtor;		/* Vector Table Offset Register */
+ 	uint32_t aircr;		/* App Interrupt and Reset Control Register */
++	uint32_t scr;		/* offset 0x10 */
++	uint32_t ccr;		/* offset 0x14 */
++	uint32_t shpr1;		/* offset 0x18 */
++	uint32_t shpr2;		/* offset 0x1c */
++	uint32_t shpr3;		/* offset 0x20 */
++	uint32_t shcrs;		/* offset 0x24 */
++	uint32_t cfsr;		/* offset 0x28 */
++	uint32_t hfsr;		/* offset 0x2C */
++	uint32_t res;		/* offset 0x30 */
++	uint32_t mmar;		/* offset 0x34 */
++	uint32_t bfar;		/* offset 0x38 */
++	uint32_t afsr;		/* offset 0x3C */
+ };
+ #define V7M_SCB				((struct v7m_scb *)V7M_SCB_BASE)
+ 
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index 166fa9e..52b36b3 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -55,8 +55,10 @@ endif
+ 
+ obj-y	+= cache.o
+ ifndef CONFIG_ARM64
++ifndef CONFIG_CPU_V7M
+ obj-y	+= cache-cp15.o
+ endif
++endif
+ 
+ obj-y	+= psci-dt.o
+ 
+-- 
+1.9.1
+

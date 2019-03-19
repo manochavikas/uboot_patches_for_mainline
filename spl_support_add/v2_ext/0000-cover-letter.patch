@@ -1,0 +1,44 @@
+From f8ab634d8c91f60503209ba295d6de0e514a7875 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Sun, 28 May 2017 12:08:39 -0700
+Subject: [PATCH v2 0/7] spl: add xip booting support
+Cc: patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+This patchset adds support for XIP (execute in place) of U-Boot or kernel image
+and enables it for stm32f7. 
+
+Changed in v2:
+- added patch to move v7m thumb mode just before next image boot
+- removed extra blank line.
+
+Vikas Manocha (7):
+  spl: armv7m: to keep ARM v7M in thumb mode before booting next image
+  stm32f7: remove duplicate configs
+  stm32: stm32f7: add spl build support
+  SPL: Add XIP booting support
+  serial: stm32f7: disable overrun
+  spl: stm32f7: add kernel boot support
+  spl: stm32f7: configure for xip booting
+
+ arch/arm/include/asm/spl.h                 |  1 +
+ arch/arm/mach-stm32/Kconfig                |  1 +
+ arch/arm/mach-stm32/stm32f7/Kconfig        | 24 ++++++++++++++++++++
+ board/st/stm32f746-disco/stm32f746-disco.c | 36 +++++++++++++++++++++++++++++-
+ common/spl/Kconfig                         |  9 ++++++++
+ common/spl/Makefile                        |  1 +
+ common/spl/spl.c                           |  6 ++---
+ common/spl/spl_xip.c                       | 28 +++++++++++++++++++++++
+ configs/stm32f746-disco_defconfig          |  5 -----
+ drivers/serial/serial_stm32x7.c            |  3 +++
+ drivers/serial/serial_stm32x7.h            |  2 ++
+ include/configs/stm32f746-disco.h          | 31 ++++++++++++++++++++++---
+ 12 files changed, 135 insertions(+), 12 deletions(-)
+ create mode 100644 common/spl/spl_xip.c
+
+-- 
+1.9.1
+

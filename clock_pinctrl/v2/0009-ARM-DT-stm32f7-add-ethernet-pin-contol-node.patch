@@ -1,0 +1,111 @@
+From f5b72c9810a23596ee84c2461634e14b53cedb08 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 3 Feb 2017 19:52:54 -0800
+Subject: [PATCH v2 09/10] ARM: DT: stm32f7: add ethernet pin contol node
+
+It also removes the ethernet pin configuration done during the board
+initialization.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: None
+
+ arch/arm/dts/stm32f746-disco.dts           |  1 +
+ arch/arm/dts/stm32f746.dtsi                | 14 +++++++++++++
+ board/st/stm32f746-disco/stm32f746-disco.c | 32 ------------------------------
+ 3 files changed, 15 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/dts/stm32f746-disco.dts b/arch/arm/dts/stm32f746-disco.dts
+index 6734f23..3d6002f 100644
+--- a/arch/arm/dts/stm32f746-disco.dts
++++ b/arch/arm/dts/stm32f746-disco.dts
+@@ -78,6 +78,7 @@
+ 
+ &mac {
+ 	status = "okay";
++	pinctrl-0 = <&ethernet_mii>;
+ 	phy-mode = "rmii";
+ 	phy-handle = <&phy0>;
+ 
+diff --git a/arch/arm/dts/stm32f746.dtsi b/arch/arm/dts/stm32f746.dtsi
+index 867f399..431e79c 100644
+--- a/arch/arm/dts/stm32f746.dtsi
++++ b/arch/arm/dts/stm32f746.dtsi
+@@ -117,6 +117,20 @@
+ 					bias-disable;
+ 				};
+ 			};
++			ethernet_mii: mii@0 {
++				pins {
++					pinmux = <STM32F746_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
++						 <STM32F746_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
++						 <STM32F746_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
++						 <STM32F746_PA2_FUNC_ETH_MDIO>,
++						 <STM32F746_PC1_FUNC_ETH_MDC>,
++						 <STM32F746_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
++						 <STM32F746_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
++						 <STM32F746_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
++						 <STM32F746_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>;
++					slew-rate = <2>;
++				};
++			};
+ 		};
+ 	};
+ };
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 9ebc36b..8343f82 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -245,48 +245,16 @@ int uart_setup_gpio(void)
+ }
+ 
+ #ifdef CONFIG_ETH_DESIGNWARE
+-const struct stm32_gpio_ctl gpio_ctl_eth = {
+-	.mode = STM32_GPIO_MODE_AF,
+-	.otype = STM32_GPIO_OTYPE_PP,
+-	.speed = STM32_GPIO_SPEED_100M,
+-	.pupd = STM32_GPIO_PUPD_NO,
+-	.af = STM32_GPIO_AF11
+-};
+-
+-static const struct stm32_gpio_dsc eth_gpio[] = {
+-	{STM32_GPIO_PORT_A, STM32_GPIO_PIN_1},	/* ETH_RMII_REF_CLK */
+-	{STM32_GPIO_PORT_A, STM32_GPIO_PIN_2},	/* ETH_MDIO */
+-	{STM32_GPIO_PORT_A, STM32_GPIO_PIN_7},	/* ETH_RMII_CRS_DV */
+-
+-	{STM32_GPIO_PORT_C, STM32_GPIO_PIN_1},	/* ETH_MDC */
+-	{STM32_GPIO_PORT_C, STM32_GPIO_PIN_4},	/* ETH_RMII_RXD0 */
+-	{STM32_GPIO_PORT_C, STM32_GPIO_PIN_5},	/* ETH_RMII_RXD1 */
+-
+-	{STM32_GPIO_PORT_G, STM32_GPIO_PIN_11},	/* ETH_RMII_TX_EN */
+-	{STM32_GPIO_PORT_G, STM32_GPIO_PIN_13},	/* ETH_RMII_TXD0 */
+-	{STM32_GPIO_PORT_G, STM32_GPIO_PIN_14},	/* ETH_RMII_TXD1 */
+-};
+ 
+ static int stmmac_setup(void)
+ {
+-	int res = 0;
+-	int i;
+-
+ 	clock_setup(SYSCFG_CLOCK_CFG);
+-
+ 	/* Set >RMII mode */
+ 	STM32_SYSCFG->pmc |= SYSCFG_PMC_MII_RMII_SEL;
+ 
+ 	clock_setup(GPIO_A_CLOCK_CFG);
+ 	clock_setup(GPIO_C_CLOCK_CFG);
+ 	clock_setup(GPIO_G_CLOCK_CFG);
+-
+-	for (i = 0; i < ARRAY_SIZE(eth_gpio); i++) {
+-		res = stm32_gpio_config(&eth_gpio[i], &gpio_ctl_eth);
+-		if (res)
+-			return res;
+-	}
+-
+ 	clock_setup(STMMAC_CLOCK_CFG);
+ 
+ 	return 0;
+-- 
+1.9.1
+

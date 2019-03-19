@@ -1,0 +1,136 @@
+From fab5b1a992db4f79760bc63e5aa1471c03efbde8 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 8 Mar 2017 16:46:02 -0800
+Subject: [U-BOOT INTERNAL REVIEW 3/4] stm32: use armv7m MPU configuration
+ support
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/mach-stm32/stm32f4/soc.c | 16 +++++-----
+ arch/arm/mach-stm32/stm32f7/soc.c | 64 ++++++++-------------------------------
+ 2 files changed, 22 insertions(+), 58 deletions(-)
+
+diff --git a/arch/arm/mach-stm32/stm32f4/soc.c b/arch/arm/mach-stm32/stm32f4/soc.c
+index b5d06db..3f45a25 100644
+--- a/arch/arm/mach-stm32/stm32f4/soc.c
++++ b/arch/arm/mach-stm32/stm32f4/soc.c
+@@ -7,7 +7,7 @@
+ 
+ #include <common.h>
+ #include <asm/io.h>
+-#include <asm/armv7m.h>
++#include <asm/armv7m_mpu.h>
+ #include <asm/arch/stm32.h>
+ 
+ u32 get_cpu_rev(void)
+@@ -17,17 +17,19 @@ u32 get_cpu_rev(void)
+ 
+ int arch_cpu_init(void)
+ {
++	struct mpu_region_config stm32_region_config[] = {
++		{ 0x00000000, REGION_0, XN_DIS, PRIV_RW_USR_RW,
++		STRONG_ORDER, REGION_4GB },
++	};
+ 	configure_clocks();
+-
+ 	/*
+ 	 * Configure the memory protection unit (MPU) to allow full access to
+ 	 * the whole 4GB address space.
+ 	 */
+-	writel(0, &V7M_MPU->rnr);
+-	writel(0, &V7M_MPU->rbar);
+-	writel((V7M_MPU_RASR_AP_RW_RW | V7M_MPU_RASR_SIZE_4GB
+-		| V7M_MPU_RASR_EN), &V7M_MPU->rasr);
+-	writel(V7M_MPU_CTRL_ENABLE | V7M_MPU_CTRL_HFNMIENA, &V7M_MPU->ctrl);
++	disable_mpu();
++	for (int i = 0; i < ARRAY_SIZE(stm32_region_config); i++)
++		mpu_config(&stm32_region_config[i]);
++	enable_mpu();
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-stm32/stm32f7/soc.c b/arch/arm/mach-stm32/stm32f7/soc.c
+index 6f9704a..3586133 100644
+--- a/arch/arm/mach-stm32/stm32f7/soc.c
++++ b/arch/arm/mach-stm32/stm32f7/soc.c
+@@ -7,7 +7,7 @@
+ 
+ #include <common.h>
+ #include <asm/io.h>
+-#include <asm/armv7m.h>
++#include <asm/armv7m_mpu.h>
+ #include <asm/arch/stm32.h>
+ 
+ u32 get_cpu_rev(void)
+@@ -17,56 +17,18 @@ u32 get_cpu_rev(void)
+ 
+ int arch_cpu_init(void)
+ {
+-	/*
+-		* Configure the memory protection unit (MPU)
+-		* 0x00000000 - 0xffffffff: Strong-order, Shareable
+-		* 0xC0000000 - 0xC0800000: Normal, Outer and inner Non-cacheable
+-	 */
+-
+-	 /* Disable MPU */
+-	 writel(0, &V7M_MPU->ctrl);
+-
+-	 writel(
+-		 0x00000000 /* address */
+-		 | 1 << 4	/* VALID */
+-		 | 0 << 0	/* REGION */
+-		 , &V7M_MPU->rbar
+-	 );
+-
+-	 /* Strong-order, Shareable */
+-	 /* TEX=000, S=1, C=0, B=0*/
+-	 writel(
+-		 (V7M_MPU_RASR_XN_ENABLE
+-			 | V7M_MPU_RASR_AP_RW_RW
+-			 | 0x01 << V7M_MPU_RASR_S_SHIFT
+-			 | 0x00 << V7M_MPU_RASR_TEX_SHIFT
+-			 | V7M_MPU_RASR_SIZE_4GB
+-			 | V7M_MPU_RASR_EN)
+-		 , &V7M_MPU->rasr
+-	 );
+-
+-	 writel(
+-		 0xC0000000 /* address */
+-		 | 1 << 4	/* VALID */
+-		 | 1 << 0	/* REGION */
+-		 , &V7M_MPU->rbar
+-	 );
+-
+-	 /* Normal, Outer and inner Non-cacheable */
+-	 /* TEX=001, S=0, C=0, B=0*/
+-	 writel(
+-		 (V7M_MPU_RASR_XN_ENABLE
+-			 | V7M_MPU_RASR_AP_RW_RW
+-			 | 0x01 << V7M_MPU_RASR_TEX_SHIFT
+-			 | 0x01 << V7M_MPU_RASR_B_SHIFT
+-			 | 0x01 << V7M_MPU_RASR_C_SHIFT
+-			 | V7M_MPU_RASR_SIZE_8MB
+-			 | V7M_MPU_RASR_EN)
+-			 , &V7M_MPU->rasr
+-	 );
+-
+-	 /* Enable MPU */
+-	 writel(V7M_MPU_CTRL_ENABLE | V7M_MPU_CTRL_HFNMIENA, &V7M_MPU->ctrl);
++	struct mpu_region_config stm32_region_config[] = {
++		{ 0x00000000, REGION_0, XN_DIS, PRIV_RW_USR_RW,
++		STRONG_ORDER, REGION_4GB },
++
++		{ 0xC0000000, REGION_1, XN_DIS, PRIV_RW_USR_RW,
++		O_I_WB_RD_WR_ALLOC, REGION_8MB },
++	};
++
++	disable_mpu();
++	for (int i = 0; i < ARRAY_SIZE(stm32_region_config); i++)
++		mpu_config(&stm32_region_config[i]);
++	enable_mpu();
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
+

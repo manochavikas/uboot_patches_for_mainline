@@ -1,0 +1,50 @@
+From e123a100ea6eb020cda7018cc0574045fbdc3762 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 26 Jan 2017 10:50:31 -0800
+Subject: [PATCH 03/10] stm32f7: serial: use clock driver to enable clock
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ drivers/serial/serial_stm32x7.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/serial/serial_stm32x7.c b/drivers/serial/serial_stm32x7.c
+index 2e6c676..969d94c 100644
+--- a/drivers/serial/serial_stm32x7.c
++++ b/drivers/serial/serial_stm32x7.c
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <common.h>
++#include <clk.h>
+ #include <dm.h>
+ #include <asm/io.h>
+ #include <serial.h>
+@@ -76,8 +77,23 @@ static int stm32_serial_probe(struct udevice *dev)
+ {
+ 	struct stm32x7_serial_platdata *plat = dev->platdata;
+ 	struct stm32_usart *const usart = plat->base;
+-	setbits_le32(&usart->cr1, USART_CR1_RE | USART_CR1_TE | USART_CR1_UE);
+ 
++#if CONFIG_IS_ENABLED(CLK)
++	int ret;
++	struct clk clk;
++	ret = clk_get_by_index(dev, 0, &clk);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_enable(&clk);
++
++	if (ret) {
++		dev_err(dev, "failed to enable clock\n");
++		return ret;
++	}
++#endif
++
++	setbits_le32(&usart->cr1, USART_CR1_RE | USART_CR1_TE | USART_CR1_UE);
+ 	return 0;
+ }
+ 
+-- 
+1.9.1
+

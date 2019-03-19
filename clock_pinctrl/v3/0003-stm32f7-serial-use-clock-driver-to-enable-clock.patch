@@ -1,0 +1,63 @@
+From a3d69c7eaa13b0ac3578d616628928eacb500f2a Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 26 Jan 2017 10:50:31 -0800
+Subject: [PATCH v3 03/10] stm32f7: serial: use clock driver to enable clock
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+Reviewed-by: Simon Glass <sjg@chromium.org>
+---
+
+Changed in v3: None
+Changed in v2:
+	- added blank lines in code like before return and after
+	  variable declaration.
+
+ drivers/serial/serial_stm32x7.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/serial/serial_stm32x7.c b/drivers/serial/serial_stm32x7.c
+index 2e6c676..1907cef 100644
+--- a/drivers/serial/serial_stm32x7.c
++++ b/drivers/serial/serial_stm32x7.c
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <common.h>
++#include <clk.h>
+ #include <dm.h>
+ #include <asm/io.h>
+ #include <serial.h>
+@@ -76,6 +77,22 @@ static int stm32_serial_probe(struct udevice *dev)
+ {
+ 	struct stm32x7_serial_platdata *plat = dev->platdata;
+ 	struct stm32_usart *const usart = plat->base;
++
++#ifdef CONFIG_CLK
++	int ret;
++	struct clk clk;
++
++	ret = clk_get_by_index(dev, 0, &clk);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_enable(&clk);
++	if (ret) {
++		dev_err(dev, "failed to enable clock\n");
++		return ret;
++	}
++#endif
++
+ 	setbits_le32(&usart->cr1, USART_CR1_RE | USART_CR1_TE | USART_CR1_UE);
+ 
+ 	return 0;
+@@ -98,6 +115,7 @@ static int stm32_serial_ofdata_to_platdata(struct udevice *dev)
+ 		return -EINVAL;
+ 
+ 	plat->base = (struct stm32_usart *)addr;
++
+ 	return 0;
+ }
+ #endif
+-- 
+1.9.1
+

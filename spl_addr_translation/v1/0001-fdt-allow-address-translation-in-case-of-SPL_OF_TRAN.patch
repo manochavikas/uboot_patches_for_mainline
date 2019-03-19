@@ -1,0 +1,26 @@
+From e832bac1f5835c2df5080b2c0b196c5d187796da Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Mar 2017 14:50:58 -0700
+Subject: [PATCH] fdt: allow address translation in case of SPL_OF_TRANSLATE
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ lib/fdtdec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/fdtdec.c b/lib/fdtdec.c
+index 81f47ef..a1c4d16 100644
+--- a/lib/fdtdec.c
++++ b/lib/fdtdec.c
+@@ -112,7 +112,7 @@ fdt_addr_t fdtdec_get_addr_size_fixed(const void *blob, int node,
+ 		return FDT_ADDR_T_NONE;
+ 	}
+ 
+-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_OF_LIBFDT)
++#if defined(CONFIG_SPL_OF_TRANSLATE) || defined(CONFIG_OF_LIBFDT)
+ 	if (translate)
+ 		addr = fdt_translate_address(blob, node, prop_addr);
+ 	else
+-- 
+1.9.1
+

@@ -1,0 +1,41 @@
+From fadf4d222b2b2f3214ec3a89d8911859bd07d403 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 16 Mar 2017 10:31:36 -0700
+Subject: [PATCH v2 18/18] stm32f7: remove not needed configuration from board
+ config
+
+This patch removes:
+	- CONFIG_CMD_MEM: enabled by default
+	- CONFIG_DESIGNWARE_ETH : not being used anywhere.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+Changed in v2: None
+
+ include/configs/stm32f746-disco.h | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 213bdcc..3771a6a 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -33,7 +33,6 @@
+ #define CONFIG_STM32_FLASH
+ #define CONFIG_STM32X7_SERIAL
+ 
+-#define CONFIG_DESIGNWARE_ETH
+ #define CONFIG_DW_GMAC_DEFAULT_DMA_PBL	(8)
+ #define CONFIG_DW_ALTDESCRIPTOR
+ #define CONFIG_MII
+@@ -75,7 +74,6 @@
+ #define CONFIG_AUTO_COMPLETE
+ #define CONFIG_CMDLINE_EDITING
+ 
+-#define CONFIG_CMD_MEM
+ #define CONFIG_BOARD_LATE_INIT
+ #define CONFIG_DISPLAY_BOARDINFO
+ #endif /* __CONFIG_H */
+-- 
+1.9.1
+

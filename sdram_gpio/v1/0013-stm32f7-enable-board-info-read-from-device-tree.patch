@@ -1,0 +1,24 @@
+From a96b093a92d18ba3ad5f002b061a6c6ee0f24ac7 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 22 Feb 2017 17:45:24 -0800
+Subject: [PATCH 13/18] stm32f7: enable board info read from device tree
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+ include/configs/stm32f746-disco.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 3bea513..b6ad8d2 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -78,4 +78,5 @@
+ 
+ #define CONFIG_CMD_MEM
+ #define CONFIG_BOARD_LATE_INIT
++#define CONFIG_DISPLAY_BOARDINFO
+ #endif /* __CONFIG_H */
+-- 
+1.9.1
+

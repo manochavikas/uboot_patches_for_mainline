@@ -1,0 +1,32 @@
+From ca882328a87047c184653f84d4d1ff52df2cb7ff Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 1 Apr 2016 10:41:58 -0700
+Subject: [PATCH] stm32: stm32_flash: add memory barrier during flash write
+
+After writing data to flash space, next instruction is checking if flash
+controller is busy writing to the flash memory. Memory barrier is required here
+to avoid transaction re-ordering for data write and busy status check.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ drivers/mtd/stm32_flash.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/mtd/stm32_flash.c b/drivers/mtd/stm32_flash.c
+index 71f4854..e16b6cd 100644
+--- a/drivers/mtd/stm32_flash.c
++++ b/drivers/mtd/stm32_flash.c
+@@ -137,6 +137,10 @@ int write_buff(flash_info_t *info, uchar *src, ulong addr, ulong cnt)
+ 	/* To make things simple use byte writes only */
+ 	for (i = 0; i < cnt; i++) {
+ 		*(uchar *)(addr + i) = src[i];
++		/*  avoid re-ordering flash data write and busy status
++		 *  check as flash memory space attributes are generally Normal
++		 */
++		mb();
+ 		while (readl(&STM32_FLASH->sr) & STM32_FLASH_SR_BSY)
+ 			;
+ 	}
+-- 
+1.9.1
+

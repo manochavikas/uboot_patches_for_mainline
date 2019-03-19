@@ -1,0 +1,39 @@
+From da8f596771bec44ebfe0bfb7fea9c94634cb0af4 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Feb 2017 15:23:51 -0800
+Subject: [PATCH 15/18] stm32f7: increase the max no of pin configuration to 70
+
+The number of pins to be configured could be more than 50 e.g. in case
+of sdram controller, there are about 56 pins (32 data lines, 12 address
+& some control signals).
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+ drivers/pinctrl/pinctrl_stm32.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/pinctrl_stm32.c b/drivers/pinctrl/pinctrl_stm32.c
+index 3d2ab53..9626204 100644
+--- a/drivers/pinctrl/pinctrl_stm32.c
++++ b/drivers/pinctrl/pinctrl_stm32.c
+@@ -5,6 +5,7 @@
+ #include <asm/gpio.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
++#define MAX_PINS_ONE_IP	70
+ 
+ static int prep_gpio_dsc(struct stm32_gpio_dsc *gpio_dsc, u32 port_pin)
+ {
+@@ -60,7 +61,7 @@ static int prep_gpio_ctl(struct stm32_gpio_ctl *gpio_ctl, u32 gpio_fn, int node)
+ static int stm32_pinctrl_set_state_simple(struct udevice *dev,
+ 					  struct udevice *periph)
+ {
+-	u32 pin_mux[50];
++	u32 pin_mux[MAX_PINS_ONE_IP];
+ 	struct fdtdec_phandle_args args;
+ 	int rv, len;
+ 
+-- 
+1.9.1
+

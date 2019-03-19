@@ -1,0 +1,246 @@
+From 861bb4955244449267c5d0736e3780b20a5f13be Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 20 Feb 2017 12:52:08 -0800
+Subject: [PATCH 08/18] dm: gpio: Add driver for stm32f7 gpio controller
+
+This patch adds gpio driver supporting driver model for stm32f7 gpio.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+ drivers/gpio/Kconfig        |   9 +++
+ drivers/gpio/Makefile       |   1 +
+ drivers/gpio/stm32f7_gpio.c | 189 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 199 insertions(+)
+ create mode 100644 drivers/gpio/stm32f7_gpio.c
+
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 8d9ab52..c8af398 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -151,6 +151,15 @@ config PIC32_GPIO
+ 	help
+ 	  Say yes here to support Microchip PIC32 GPIOs.
+ 
++config STM32F7_GPIO
++	bool "ST STM32 GPIO driver"
++	depends on DM_GPIO
++	default y
++	help
++	  Device model driver support for STM32 GPIO controller. It should be
++	  usable on many stm32 families like stm32f4 & stm32H7.
++	  Tested on STM32F7.
++
+ config MVEBU_GPIO
+ 	bool "Marvell MVEBU GPIO driver"
+ 	depends on DM_GPIO && ARCH_MVEBU
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 8939226..9c2a9cc 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -49,6 +49,7 @@ oby-$(CONFIG_SX151X)		+= sx151x.o
+ obj-$(CONFIG_SUNXI_GPIO)	+= sunxi_gpio.o
+ obj-$(CONFIG_LPC32XX_GPIO)	+= lpc32xx_gpio.o
+ obj-$(CONFIG_STM32_GPIO)	+= stm32_gpio.o
++obj-$(CONFIG_STM32F7_GPIO)	+= stm32f7_gpio.o
+ obj-$(CONFIG_GPIO_UNIPHIER)	+= gpio-uniphier.o
+ obj-$(CONFIG_ZYNQ_GPIO)		+= zynq_gpio.o
+ obj-$(CONFIG_VYBRID_GPIO)	+= vybrid_gpio.o
+diff --git a/drivers/gpio/stm32f7_gpio.c b/drivers/gpio/stm32f7_gpio.c
+new file mode 100644
+index 0000000..369227a
+--- /dev/null
++++ b/drivers/gpio/stm32f7_gpio.c
+@@ -0,0 +1,189 @@
++/*
++ * (C) Copyright 2017
++ * Vikas Manocha, <vikas.manocha@st.com>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <clk.h>
++#include <dm.h>
++#include <fdtdec.h>
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <asm/io.h>
++#include <asm/arch/stm32.h>
++#include <asm/arch/gpio.h>
++#include <asm/gpio.h>
++
++#define STM32_GPIOS_PER_BANK		16
++#define MAX_SIZE_BANK_NAME		6
++#define MODE_BITS(gpio_pin)		(gpio_pin * 2)
++#define MODE_BITS_MASK			3
++#define OSPEED_MASK			3
++#define PUPD_MASK			3
++#define OTYPE_MSK			1
++#define AFR_MASK			0xF
++#define IN_OUT_BIT_INDEX(gpio_pin)	(1UL << (gpio_pin))
++
++DECLARE_GLOBAL_DATA_PTR;
++
++struct stm32_gpio_regs {
++	u32 moder;	/* GPIO port mode */
++	u32 otyper;	/* GPIO port output type */
++	u32 ospeedr;	/* GPIO port output speed */
++	u32 pupdr;	/* GPIO port pull-up/pull-down */
++	u32 idr;	/* GPIO port input data */
++	u32 odr;	/* GPIO port output data */
++	u32 bsrr;	/* GPIO port bit set/reset */
++	u32 lckr;	/* GPIO port configuration lock */
++	u32 afr[2];	/* GPIO alternate function */
++};
++
++struct stm32_gpio_priv {
++	struct stm32_gpio_regs *regs;
++	char name[MAX_SIZE_BANK_NAME];
++};
++
++#define CHECK_CTL(x)	(!x || x->af > 15 || x->mode > 3 || x->otype > 1 || \
++			x->pupd > 2 || x->speed > 3)
++
++int stm32_gpio_config(struct gpio_desc *desc, const struct stm32_gpio_ctl *ctl)
++{
++	struct stm32_gpio_priv *priv = dev_get_priv(desc->dev);
++	struct stm32_gpio_regs *regs = priv->regs;
++	u32 index;
++
++	if (CHECK_CTL(ctl))
++		return -EINVAL;
++
++	index = (desc->offset & 0x07) * 4;
++	clrsetbits_le32(&regs->afr[desc->offset >> 3], AFR_MASK << index,
++			ctl->af << index);
++
++	index = desc->offset * 2;
++	clrsetbits_le32(&regs->moder, MODE_BITS_MASK << index,
++			ctl->mode << index);
++	clrsetbits_le32(&regs->ospeedr, OSPEED_MASK << index,
++			ctl->speed << index);
++	clrsetbits_le32(&regs->pupdr, PUPD_MASK << index, ctl->pupd << index);
++
++	index = desc->offset;
++	clrsetbits_le32(&regs->otyper, OTYPE_MSK << index, ctl->otype << index);
++
++	return 0;
++}
++
++static int stm32_gpio_direction_input(struct udevice *dev, unsigned offset)
++{
++	struct stm32_gpio_priv *priv = dev_get_priv(dev);
++	struct stm32_gpio_regs *regs = priv->regs;
++	int bits_index = MODE_BITS(offset);
++	int mask = MODE_BITS_MASK << bits_index;
++
++	clrsetbits_le32(&regs->moder, mask, STM32_GPIO_MODE_IN << bits_index);
++
++	return 0;
++}
++
++static int stm32_gpio_direction_output(struct udevice *dev, unsigned offset,
++				       int value)
++{
++	struct stm32_gpio_priv *priv = dev_get_priv(dev);
++	struct stm32_gpio_regs *regs = priv->regs;
++	int bits_index = MODE_BITS(offset);
++	int mask = MODE_BITS_MASK << bits_index;
++
++	clrsetbits_le32(&regs->moder, mask, STM32_GPIO_MODE_OUT << bits_index);
++	mask = IN_OUT_BIT_INDEX(offset);
++	clrsetbits_le32(&regs->odr, mask, value ? mask : 0);
++
++	return 0;
++}
++
++static int stm32_gpio_get_value(struct udevice *dev, unsigned offset)
++{
++	struct stm32_gpio_priv *priv = dev_get_priv(dev);
++	struct stm32_gpio_regs *regs = priv->regs;
++
++	return readl(&regs->idr) & IN_OUT_BIT_INDEX(offset) ? 1 : 0;
++}
++
++static int stm32_gpio_set_value(struct udevice *dev, unsigned offset, int value)
++{
++	struct stm32_gpio_priv *priv = dev_get_priv(dev);
++	struct stm32_gpio_regs *regs = priv->regs;
++	int mask = IN_OUT_BIT_INDEX(offset);
++
++	clrsetbits_le32(&regs->odr, mask, value ? mask : 0);
++
++	return 0;
++}
++
++static const struct dm_gpio_ops gpio_stm32_ops = {
++	.direction_input	= stm32_gpio_direction_input,
++	.direction_output	= stm32_gpio_direction_output,
++	.get_value		= stm32_gpio_get_value,
++	.set_value		= stm32_gpio_set_value,
++};
++
++static int gpio_stm32_probe(struct udevice *dev)
++{
++	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
++	struct stm32_gpio_priv *priv = dev_get_priv(dev);
++	fdt_addr_t addr;
++	int ret;
++
++	addr = fdtdec_get_addr_size_auto_parent(gd->fdt_blob,
++						dev->parent->of_offset,
++						dev->of_offset, "reg", 0, NULL,
++						true);
++	if (addr == FDT_ADDR_T_NONE)
++		return -EINVAL;
++
++	priv->regs = (struct stm32_gpio_regs *)addr;
++
++	ret = fdtdec_get_byte_array(gd->fdt_blob, dev->of_offset,
++				    "st,bank-name", (u8 *)priv->name,
++				    sizeof(priv->name) - 1);
++	if (ret)
++		return ret;
++
++	priv->name[MAX_SIZE_BANK_NAME - 1] = '\0';
++	uc_priv->gpio_count = STM32_GPIOS_PER_BANK;
++	uc_priv->bank_name = priv->name;
++	debug("%s, addr = 0x%p, bank_name = %s\n", __func__, (u32 *)priv->regs,
++	      uc_priv->bank_name);
++
++#ifdef CONFIG_CLK
++	struct clk clk;
++	ret = clk_get_by_index(dev, 0, &clk);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_enable(&clk);
++
++	if (ret) {
++		dev_err(dev, "failed to enable clock\n");
++		return ret;
++	}
++	debug("clock enabled for device %s\n", dev->name);
++#endif
++
++	return 0;
++}
++
++static const struct udevice_id stm32_gpio_ids[] = {
++	{ .compatible = "st,stm32-gpio" },
++	{ }
++};
++
++U_BOOT_DRIVER(gpio_stm32) = {
++	.name	= "gpio_stm32",
++	.id	= UCLASS_GPIO,
++	.of_match = stm32_gpio_ids,
++	.probe	= gpio_stm32_probe,
++	.ops	= &gpio_stm32_ops,
++	.flags	= DM_FLAG_PRE_RELOC | DM_UC_FLAG_SEQ_ALIAS,
++	.priv_auto_alloc_size	= sizeof(struct stm32_gpio_priv),
++};
+-- 
+1.9.1
+

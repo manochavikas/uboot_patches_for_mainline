@@ -1,0 +1,46 @@
+From 8fee1aceeb869389e0e68a5d4449b3f43b4e956a Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 2 May 2017 14:38:37 -0700
+Subject: [PATCH 2/2] arvm7m: add cleanup before linux booting
+
+Data cache memory needs to be disabled before handing over control to
+linux kernel. This patch populates the cleanup_before_linux stub.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/cpu/armv7m/cpu.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/cpu/armv7m/cpu.c b/arch/arm/cpu/armv7m/cpu.c
+index 58cde93..a424bab 100644
+--- a/arch/arm/cpu/armv7m/cpu.c
++++ b/arch/arm/cpu/armv7m/cpu.c
+@@ -18,6 +18,25 @@
+  */
+ int cleanup_before_linux(void)
+ {
++	/*
++	 * this function is called just before we call linux
++	 * it prepares the processor for linux
++	 *
++	 * disable interrupt and turn off caches etc ...
++	 */
++	disable_interrupts();
++	/*
++	 * turn off D-cache
++	 * dcache_disable() in turn flushes the d-cache
++	 * MPU is still enabled & can't be disabled as the u-boot
++	 * code might be running in sdram which by default is not
++	 * executable area.
++	 */
++	dcache_disable();
++	/* invalidate to make sure no cache line gets dirty between
++	 * dcache flushing and disabling dcache */
++	invalidate_dcache_all();
++
+ 	return 0;
+ }
+ 
+-- 
+1.9.1
+

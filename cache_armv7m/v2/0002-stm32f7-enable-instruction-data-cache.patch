@@ -1,0 +1,52 @@
+From 9a48cdafa9afdccfa6e22f902d65eb03dfe217cd Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Sun, 5 Mar 2017 14:49:45 -0800
+Subject: [PATCH v2 2/2] stm32f7: enable instruction & data cache
+
+It also enables commands for cache enable/disable/status.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: None
+
+ arch/arm/mach-stm32/stm32f7/soc.c | 2 ++
+ include/configs/stm32f746-disco.h | 4 +---
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-stm32/stm32f7/soc.c b/arch/arm/mach-stm32/stm32f7/soc.c
+index 8baee99..ca54603 100644
+--- a/arch/arm/mach-stm32/stm32f7/soc.c
++++ b/arch/arm/mach-stm32/stm32f7/soc.c
+@@ -60,6 +60,8 @@ int arch_cpu_init(void)
+ 		 (V7M_MPU_RASR_XN_ENABLE
+ 			 | V7M_MPU_RASR_AP_RW_RW
+ 			 | 0x01 << V7M_MPU_RASR_TEX_SHIFT
++			 | 0x01 << V7M_MPU_RASR_B_SHIFT
++			 | 0x01 << V7M_MPU_RASR_C_SHIFT
+ 			 | V7M_MPU_RASR_SIZE_8MB
+ 			 | V7M_MPU_RASR_EN)
+ 			 , &V7M_MPU->rasr
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index ae3211a..9e9406a 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -14,9 +14,6 @@
+ #define CONFIG_SYS_INIT_SP_ADDR		0x20050000
+ #define CONFIG_SYS_TEXT_BASE		0x08000000
+ 
+-#define CONFIG_SYS_ICACHE_OFF
+-#define CONFIG_SYS_DCACHE_OFF
+-
+ /*
+  * Configuration of the external SDRAM memory
+  */
+@@ -82,4 +79,5 @@
+ #define CONFIG_CMDLINE_EDITING
+ 
+ #define CONFIG_CMD_MEM
++#define CONFIG_CMD_CACHE
+ #endif /* __CONFIG_H */
+-- 
+1.9.1
+

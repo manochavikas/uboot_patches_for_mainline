@@ -1,0 +1,47 @@
+From 0763c62ac272c6a4b008591df38ec8872a9a5ab9 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 26 Jan 2017 16:43:35 -0800
+Subject: [PATCH v2 05/10] stm32f7: clk: remove usart1 clock enable from board
+ init
+
+Before clock driver availability it was required to enable usart1 clock
+for serial init but now with clock driver is taking care of usart1 clock.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: None
+
+ board/st/stm32f746-disco/stm32f746-disco.c | 1 -
+ drivers/clk/clk_stm32f7.c                  | 3 ---
+ 2 files changed, 4 deletions(-)
+
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 72212f4..ee1deb5 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -380,7 +380,6 @@ int board_early_init_f(void)
+ 	int res;
+ 
+ 	res = uart_setup_gpio();
+-	clock_setup(USART1_CLOCK_CFG);
+ 	if (res)
+ 		return res;
+ 
+diff --git a/drivers/clk/clk_stm32f7.c b/drivers/clk/clk_stm32f7.c
+index 4c5388a..0d86395 100644
+--- a/drivers/clk/clk_stm32f7.c
++++ b/drivers/clk/clk_stm32f7.c
+@@ -228,9 +228,6 @@ static int stm32_clk_enable(struct clk *clk)
+ void clock_setup(int peripheral)
+ {
+ 	switch (peripheral) {
+-	case USART1_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->apb2enr, RCC_APB2ENR_USART1EN);
+-		break;
+ 	case GPIO_A_CLOCK_CFG:
+ 		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_A_EN);
+ 		break;
+-- 
+1.9.1
+

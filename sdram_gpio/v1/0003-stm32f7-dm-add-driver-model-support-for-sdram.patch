@@ -1,0 +1,60 @@
+From 45c30653f7e999f2610b23928248ea50fb46c6e5 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 7 Feb 2017 16:41:32 -0800
+Subject: [PATCH 03/18] stm32f7: dm: add driver model support for sdram
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+ drivers/ram/stm32_sdram.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/drivers/ram/stm32_sdram.c b/drivers/ram/stm32_sdram.c
+index 13f8964..67be61f 100644
+--- a/drivers/ram/stm32_sdram.c
++++ b/drivers/ram/stm32_sdram.c
+@@ -6,6 +6,8 @@
+  */
+ 
+ #include <common.h>
++#include <dm.h>
++#include <ram.h>
+ #include <asm/io.h>
+ #include <asm/arch/fmc.h>
+ #include <asm/arch/stm32.h>
+@@ -117,3 +119,32 @@ int stm32_sdram_init(void)
+ 
+ 	return 0;
+ }
++
++static int stm32_fmc_probe(struct udevice *dev)
++{
++	stm32_sdram_init();
++	return 0;
++}
++
++static int stm32_fmc_get_info(struct udevice *dev, struct ram_info *info)
++{
++	info->size = CONFIG_SYS_RAM_SIZE;
++	return 0;
++}
++
++static struct ram_ops stm32_fmc_ops = {
++	.get_info = stm32_fmc_get_info,
++};
++
++static const struct udevice_id stm32_fmc_ids[] = {
++	{ .compatible = "st,stm32-fmc" },
++	{ }
++};
++
++U_BOOT_DRIVER(stm32_fmc) = {
++	.name = "stm32_fmc",
++	.id = UCLASS_RAM,
++	.of_match = stm32_fmc_ids,
++	.ops = &stm32_fmc_ops,
++	.probe = stm32_fmc_probe,
++};
+-- 
+1.9.1
+

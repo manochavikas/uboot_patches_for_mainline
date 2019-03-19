@@ -1,0 +1,176 @@
+From 7e9f2fe89643e508fa743d1d12a0c22b68e07787 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Mar 2017 14:28:31 -0700
+Subject: [PATCH ST INTERNAL REVIEW] stm32: stm32f7: add spl build support
+
+This commit supports booting from stm32 internal nor flash. spl U-Boot
+initializes the sdram memory, copies next image (e.g. standard U-Boot)
+to sdram & then jumps to entry point.
+
+Here are the flash memory addresses for U-Boot-spl & standard U-Boot:
+	- spl U-Boot		: 0x0800_0000
+	- standard U-Boot	: 0x0800_8000
+
+To compile u-boot without spl: Remove SUPPORT_SPL configuration
+(arch/arm/mach-stm32/Kconfig)
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/mach-stm32/Kconfig                |  1 +
+ board/st/stm32f746-disco/stm32f746-disco.c | 27 ++++++++++++++++++++++++++-
+ configs/stm32f746-disco_defconfig          | 23 ++++++++++++++++++++++-
+ include/configs/stm32f746-disco.h          | 22 +++++++++++++++++++++-
+ 4 files changed, 70 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index ec6b3ff..879383f 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -8,6 +8,7 @@ config STM32F1
+ 
+ config STM32F7
+ 	bool "stm32f7 family"
++	select SUPPORT_SPL
+ 
+ source "arch/arm/mach-stm32/stm32f4/Kconfig"
+ source "arch/arm/mach-stm32/stm32f1/Kconfig"
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 4b0c7f0..0579162 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -8,6 +8,7 @@
+ #include <common.h>
+ #include <dm.h>
+ #include <ram.h>
++#include <spl.h>
+ #include <asm/io.h>
+ #include <asm/armv7m.h>
+ #include <asm/arch/stm32.h>
+@@ -36,16 +37,18 @@ int get_memory_base_size(fdt_addr_t *mr_base, fdt_addr_t *mr_size)
+ }
+ int dram_init(void)
+ {
+-	struct udevice *dev;
+ 	int rv;
+ 	fdt_addr_t mr_base, mr_size;
+ 
++#ifndef CONFIG_SUPPORT_SPL
++	struct udevice *dev;
+ 	rv = uclass_get_device(UCLASS_RAM, 0, &dev);
+ 	if (rv) {
+ 		debug("DRAM init failed: %d\n", rv);
+ 		return rv;
+ 	}
+ 
++#endif
+ 	rv = get_memory_base_size(&mr_base, &mr_size);
+ 	if (rv)
+ 		return rv;
+@@ -85,6 +88,28 @@ int board_early_init_f(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_SPL_BUILD
++int spl_dram_init(void)
++{
++	struct udevice *dev;
++	int rv;
++	rv = uclass_get_device(UCLASS_RAM, 0, &dev);
++	if (rv)
++		debug("DRAM init failed: %d\n", rv);
++	return rv;
++}
++void spl_board_init(void)
++{
++	spl_dram_init();
++	preloader_console_init();
++	arch_cpu_init(); /* to configure mpu for sdram rw permissions */
++}
++u32 spl_boot_device(void)
++{
++	return BOOT_DEVICE_NOR;
++}
++
++#endif
+ u32 get_board_rev(void)
+ {
+ 	return 0;
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+index 5e86a76..d433b1b 100644
+--- a/configs/stm32f746-disco_defconfig
++++ b/configs/stm32f746-disco_defconfig
+@@ -35,7 +35,6 @@ CONFIG_SPI_FLASH=y
+ CONFIG_SPI_FLASH_STMICRO=y
+ CONFIG_DM_ETH=y
+ CONFIG_ETH_DESIGNWARE=y
+-# CONFIG_SPL_SERIAL_PRESENT is not set
+ CONFIG_DM_SPI=y
+ CONFIG_STM32_QSPI=y
+ CONFIG_OF_LIBFDT_OVERLAY=y
+@@ -49,3 +48,25 @@ CONFIG_STM32_SDRAM=y
+ CONFIG_DM_GPIO=y
+ CONFIG_STM32F7_GPIO=y
+ CONFIG_SYS_MALLOC_F_LEN=0xC00
++#ifdef CONFIG_SUPPORT_SPL
++CONFIG_SPL=y
++CONFIG_SPL_FRAMEWORK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_SPL_CLK=y
++CONFIG_SPL_OF_CONTROL=y
++CONFIG_SPL_OF_LIBFDT=y
++CONFIG_SPL_GPIO_SUPPORT=y
++CONFIG_SPL_LIBCOMMON_SUPPORT=y
++CONFIG_SPL_LIBGENERIC_SUPPORT=y
++CONFIG_SPL_DRIVERS_MISC_SUPPORT=y
++CONFIG_SPL_SYS_MALLOC_SIMPLE=y
++CONFIG_SPL_MTD_SUPPORT=y
++CONFIG_SPL_DM=y
++CONFIG_SPL_PINCTRL=y
++# CONFIG_SPL_PINCTRL_FULL is not set
++CONFIG_SPL_RAM=y
++CONFIG_SPL_DM_SEQ_ALIAS=y
++CONFIG_SPL_OF_TRANSLATE=y
++# CONFIG_OF_SPL_REMOVE_PROPS is not set
++CONFIG_SPL_NOR_SUPPORT=y
++#endif
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 3771a6a..bf65481 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -12,7 +12,12 @@
+ 
+ #define CONFIG_SYS_FLASH_BASE		0x08000000
+ #define CONFIG_SYS_INIT_SP_ADDR		0x20050000
+-#define CONFIG_SYS_TEXT_BASE		0x08000000
++
++#ifdef CONFIG_SUPPORT_SPL
++#define CONFIG_SYS_TEXT_BASE		0xC0000000
++#else
++#define CONFIG_SYS_TEXT_BASE		CONFIG_SYS_FLASH_BASE
++#endif
+ 
+ #define CONFIG_SYS_ICACHE_OFF
+ #define CONFIG_SYS_DCACHE_OFF
+@@ -76,4 +81,19 @@
+ 
+ #define CONFIG_BOARD_LATE_INIT
+ #define CONFIG_DISPLAY_BOARDINFO
++
++/* For SPL */
++#ifdef CONFIG_SUPPORT_SPL
++#define CONFIG_SPL_STACK		CONFIG_SYS_INIT_SP_ADDR
++#define CONFIG_SPL_FRAMEWORK
++#define CONFIG_SPL_BOARD_INIT
++#define CONFIG_SPL_TEXT_BASE		CONFIG_SYS_FLASH_BASE
++#define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
++#define CONFIG_SYS_SPL_LEN		0x00008000
++#define CONFIG_SYS_UBOOT_START		0XC00003FD
++#define CONFIG_SYS_UBOOT_BASE		(CONFIG_SYS_FLASH_BASE + \
++					 CONFIG_SYS_SPL_LEN)
++#endif
++/* For SPL ends */
++
+ #endif /* __CONFIG_H */
+-- 
+1.9.1
+

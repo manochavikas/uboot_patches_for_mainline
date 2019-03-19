@@ -1,0 +1,74 @@
+From 5cfc8070aca5fd15fbea4535d9a4d827277fc081 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 12 Jun 2017 10:08:55 -0700
+Subject: [PATCH] arm: armv7m: clean up armv7m unified code compilation
+
+unified syntax should be selected by config ARM_ASM_UNIFIED
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/armv7m.h | 5 -----
+ arch/arm/lib/crt0.S           | 4 +---
+ arch/arm/lib/relocate.S       | 1 +
+ arch/arm/lib/vectors_m.S      | 2 +-
+ 4 files changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/armv7m.h b/arch/arm/include/asm/armv7m.h
+index 278f302..ad67b4f 100644
+--- a/arch/arm/include/asm/armv7m.h
++++ b/arch/arm/include/asm/armv7m.h
+@@ -10,11 +10,6 @@
+ #ifndef ARMV7M_H
+ #define ARMV7M_H
+ 
+-#if defined(__ASSEMBLY__)
+-.syntax unified
+-.thumb
+-#endif
+-
+ /* armv7m fixed base addresses */
+ #define V7M_SCS_BASE		0xE000E000
+ #define V7M_NVIC_BASE		(V7M_SCS_BASE + 0x0100)
+diff --git a/arch/arm/lib/crt0.S b/arch/arm/lib/crt0.S
+index d7ff9f0..fe312db 100644
+--- a/arch/arm/lib/crt0.S
++++ b/arch/arm/lib/crt0.S
+@@ -8,9 +8,7 @@
+ #include <config.h>
+ #include <asm-offsets.h>
+ #include <linux/linkage.h>
+-#ifdef CONFIG_CPU_V7M
+-#include <asm/armv7m.h>
+-#endif
++#include <asm/assembler.h>
+ 
+ /*
+  * This file handles the target-independent stages of the U-Boot
+diff --git a/arch/arm/lib/relocate.S b/arch/arm/lib/relocate.S
+index c5b135d..e5f7267 100644
+--- a/arch/arm/lib/relocate.S
++++ b/arch/arm/lib/relocate.S
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <asm-offsets.h>
++#include <asm/assembler.h>
+ #include <config.h>
+ #include <elf.h>
+ #include <linux/linkage.h>
+diff --git a/arch/arm/lib/vectors_m.S b/arch/arm/lib/vectors_m.S
+index d75e477..7d2d55c 100644
+--- a/arch/arm/lib/vectors_m.S
++++ b/arch/arm/lib/vectors_m.S
+@@ -5,7 +5,7 @@
+  */
+ 
+ #include <config.h>
+-#include <asm/armv7m.h>
++#include <asm/assembler.h>
+ #include <linux/linkage.h>
+ 
+ .type __hard_fault_entry, %function
+-- 
+2.7.4
+

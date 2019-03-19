@@ -1,0 +1,67 @@
+From 47bc067115a0027c50133aa19ec0896c1aed65ed Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 9 Mar 2016 14:59:34 -0800
+Subject: [PATCH 2/2] stm32f746-disco: enable flash support
+
+This patch enables embedded flash for stm32f746 discovery board.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/include/asm/arch-stm32f7/stm32.h |  6 ++++++
+ include/configs/stm32f746-disco.h         | 11 ++++-------
+ 2 files changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch-stm32f7/stm32.h b/arch/arm/include/asm/arch-stm32f7/stm32.h
+index 713eb2e..68bdab0 100644
+--- a/arch/arm/include/asm/arch-stm32f7/stm32.h
++++ b/arch/arm/include/asm/arch-stm32f7/stm32.h
+@@ -50,6 +50,12 @@
+ 
+ #define SDRAM_FMC_BASE		(AHB3_PERIPH_BASE + 0x4A0000140)
+ 
++static const u32 sect_sz_kb[CONFIG_SYS_MAX_FLASH_SECT] = {
++	[0 ... 3] =	32 * 1024,
++	[4] =		128 * 1024,
++	[5 ... 7] =	256 * 1024
++};
++
+ enum clock {
+ 	CLOCK_CORE,
+ 	CLOCK_AHB,
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index e1b8bcb..807ab65 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -9,7 +9,7 @@
+ #define __CONFIG_H
+ 
+ #define CONFIG_SYS_THUMB_BUILD
+-#define CONFIG_SYS_NO_FLASH
++/*#define CONFIG_SYS_NO_FLASH*/
+ 
+ #define CONFIG_OF_LIBFDT
+ #define CONFIG_BOARD_EARLY_INIT_F
+@@ -33,17 +33,14 @@
+ #define CONFIG_SYS_LOAD_ADDR		0x20000000
+ #define CONFIG_LOADADDR			0x20000000
+ 
+-#define CONFIG_SYS_MAX_FLASH_SECT	12
+-#define CONFIG_SYS_MAX_FLASH_BANKS	2
++#define CONFIG_SYS_MAX_FLASH_SECT	8
++#define CONFIG_SYS_MAX_FLASH_BANKS	1
+ 
+-#ifndef CONFIG_SYS_NO_FLASH
+-#define CONFIG_ENV_IS_IN_FLASH
+-#else
+ #define CONFIG_ENV_IS_NOWHERE
+-#endif
+ #define CONFIG_ENV_SIZE			(8 << 10)
+ 
+ #define CONFIG_STM32_GPIO
++#define CONFIG_STM32_FLASH
+ #define CONFIG_STM32X7_SERIAL
+ 
+ #define CONFIG_SYS_CLK_FREQ		16*1000*1000 /* 180 MHz */
+-- 
+1.9.1
+

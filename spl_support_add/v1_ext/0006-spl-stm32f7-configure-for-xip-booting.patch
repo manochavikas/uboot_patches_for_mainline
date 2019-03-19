@@ -1,0 +1,104 @@
+From 31684e00b8ae2e2a6982740d4d47734eb01c5906 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 15 May 2017 15:41:31 -0700
+Subject: [PATCH 6/6] spl: stm32f7: configure for xip booting
+Cc: patrick.delaunay@st.com,
+    patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+With xip booting configuration, we don't need to copy the next image
+(U-Boot or linux xipimage) from flash to sdram area.
+
+Flash memory organization is like this:
+	spl-U-Boot:	u-boot-spl.bin 	: 0x0800_0000
+	U-Boot :	u-boot-dtb.bin	: 0x0800_8000
+	linux :		xipImage	: 0x0800_8000
+
+It is also possible to have U-Boot binary & linux binaries configured at
+different addresses of flash memory like U-Boot at 0x0800_8000 & linux
+xipImage at 0x0800_4000. But in any case, spl-U-Boot needs to be compiled for
+U-Boot as next binary with SPL_OS_BOOT option disabled.
+By default, spl is configured to boot linux xipImage.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/mach-stm32/stm32f7/Kconfig        |  1 +
+ board/st/stm32f746-disco/stm32f746-disco.c |  2 +-
+ include/configs/stm32f746-disco.h          | 12 +++++-------
+ 3 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-stm32/stm32f7/Kconfig b/arch/arm/mach-stm32/stm32f7/Kconfig
+index 3f6455e..6acf9cf 100644
+--- a/arch/arm/mach-stm32/stm32f7/Kconfig
++++ b/arch/arm/mach-stm32/stm32f7/Kconfig
+@@ -22,6 +22,7 @@ config SUPPORT_SPL
+ 	select SPL_DM_SEQ_ALIAS
+ 	select SPL_OF_TRANSLATE
+ 	select SPL_OS_BOOT
++	select SPL_XIP_SUPPORT
+ 
+ config SPL_PINCTRL_FULL
+ 	default n if TARGET_STM32F746_DISCO
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 335dcb9..11957e0 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -117,7 +117,7 @@ void spl_board_init(void)
+ }
+ u32 spl_boot_device(void)
+ {
+-	return BOOT_DEVICE_NOR;
++	return BOOT_DEVICE_XIP;
+ }
+ 
+ #endif
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 9052025..4e0edcb 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -12,17 +12,18 @@
+ #define CONFIG_SYS_INIT_SP_ADDR		0x20050000
+ 
+ #ifdef CONFIG_SUPPORT_SPL
+-#define CONFIG_SYS_TEXT_BASE		0xC0000000
++#define CONFIG_SYS_TEXT_BASE		0x08008000
++#define CONFIG_SYS_LOAD_ADDR		0x08008000
+ #else
+ #define CONFIG_SYS_TEXT_BASE		CONFIG_SYS_FLASH_BASE
++#define CONFIG_SYS_LOAD_ADDR		0xC0400000
++#define CONFIG_LOADADDR			0xC0400000
+ #endif
+ 
+ /*
+  * Configuration of the external SDRAM memory
+  */
+ #define CONFIG_NR_DRAM_BANKS		1
+-#define CONFIG_SYS_LOAD_ADDR		0xC0400000
+-#define CONFIG_LOADADDR			0xC0400000
+ 
+ #define CONFIG_SYS_MAX_FLASH_SECT	8
+ #define CONFIG_SYS_MAX_FLASH_BANKS	1
+@@ -83,16 +84,13 @@
+ #define CONFIG_SPL_TEXT_BASE		CONFIG_SYS_FLASH_BASE
+ #define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
+ #define CONFIG_SYS_SPL_LEN		0x00008000
+-#define CONFIG_SYS_UBOOT_START		0XC00003FD
++#define CONFIG_SYS_UBOOT_START		0x080083FD
+ #define CONFIG_SYS_UBOOT_BASE		(CONFIG_SYS_FLASH_BASE + \
+ 					 CONFIG_SYS_SPL_LEN)
+ 
+-#define CONFIG_SYS_OS_BASE		0x08040000
+ /* DT blob (fdt) address */
+-#define CONFIG_SYS_SPL_ARGS_ADDR        0xC0000100
+ #define CONFIG_SYS_FDT_BASE		(CONFIG_SYS_FLASH_BASE + \
+ 					0x1C0000)
+-#define CONFIG_SYS_FDT_SIZE		(20*1024)
+ #endif
+ /* For SPL ends */
+ 
+-- 
+1.9.1
+

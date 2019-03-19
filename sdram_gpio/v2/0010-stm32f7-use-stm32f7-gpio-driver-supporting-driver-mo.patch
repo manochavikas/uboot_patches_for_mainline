@@ -1,0 +1,278 @@
+From 18ea709c9a639adf354d2ca744fdd8b64f997c6e Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 20 Feb 2017 13:13:45 -0800
+Subject: [PATCH v2 10/18] stm32f7: use stm32f7 gpio driver supporting driver
+ model
+
+With this gpio driver supporting DM, there is no need to enable clocks
+for different gpios (for pin muxing) in the board specific code.
+
+Need to increase the allocatable area required before relocation from 0x400 to
+0xC00 becuase of 10 new gpio devices(& new gpio class) added in device tree.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+Reviewed-by: Simon Glass <sjg@chromium.org>
+---
+Changed in v2: None
+
+ arch/arm/include/asm/arch-stm32f7/gpio.h   |  3 +-
+ board/st/stm32f746-disco/stm32f746-disco.c | 70 ++----------------------------
+ configs/stm32f746-disco_defconfig          |  4 ++
+ drivers/clk/clk_stm32f7.c                  | 39 -----------------
+ drivers/pinctrl/pinctrl_stm32.c            |  9 +++-
+ include/configs/stm32f746-disco.h          |  1 -
+ 6 files changed, 16 insertions(+), 110 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch-stm32f7/gpio.h b/arch/arm/include/asm/arch-stm32f7/gpio.h
+index 5c0300f..882041d 100644
+--- a/arch/arm/include/asm/arch-stm32f7/gpio.h
++++ b/arch/arm/include/asm/arch-stm32f7/gpio.h
+@@ -7,6 +7,7 @@
+ 
+ #ifndef _STM32_GPIO_H_
+ #define _STM32_GPIO_H_
++#include <asm/gpio.h>
+ 
+ enum stm32_gpio_port {
+ 	STM32_GPIO_PORT_A = 0,
+@@ -122,7 +123,7 @@ static inline unsigned stm32_gpio_to_pin(unsigned gpio)
+ 	return gpio % 16;
+ }
+ 
+-int stm32_gpio_config(const struct stm32_gpio_dsc *gpio_dsc,
++int stm32_gpio_config(struct gpio_desc *gpio_dsc,
+ 		const struct stm32_gpio_ctl *gpio_ctl);
+ int stm32_gpout_set(const struct stm32_gpio_dsc *gpio_dsc, int state);
+ 
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 370db15..45a2c47 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -20,37 +20,12 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+-const struct stm32_gpio_ctl gpio_ctl_gpout = {
+-	.mode = STM32_GPIO_MODE_OUT,
+-	.otype = STM32_GPIO_OTYPE_PP,
+-	.speed = STM32_GPIO_SPEED_50M,
+-	.pupd = STM32_GPIO_PUPD_NO,
+-	.af = STM32_GPIO_AF0
+-};
+-
+-static int fmc_setup_gpio(void)
+-{
+-	clock_setup(GPIO_B_CLOCK_CFG);
+-	clock_setup(GPIO_C_CLOCK_CFG);
+-	clock_setup(GPIO_D_CLOCK_CFG);
+-	clock_setup(GPIO_E_CLOCK_CFG);
+-	clock_setup(GPIO_F_CLOCK_CFG);
+-	clock_setup(GPIO_G_CLOCK_CFG);
+-	clock_setup(GPIO_H_CLOCK_CFG);
+-
+-	return 0;
+-}
+-
+ int dram_init(void)
+ {
+ 	struct udevice *dev;
+ 	struct ram_info ram;
+ 	int rv;
+ 
+-	rv = fmc_setup_gpio();
+-	if (rv)
+-		return rv;
+-
+ 	rv = uclass_get_device(UCLASS_RAM, 0, &dev);
+ 	if (rv) {
+ 		debug("DRAM init failed: %d\n", rv);
+@@ -73,37 +48,21 @@ int dram_init(void)
+ 	return rv;
+ }
+ 
+-int uart_setup_gpio(void)
+-{
+-	clock_setup(GPIO_A_CLOCK_CFG);
+-	clock_setup(GPIO_B_CLOCK_CFG);
+-	return 0;
+-}
+-
+ #ifdef CONFIG_ETH_DESIGNWARE
+-
+ static int stmmac_setup(void)
+ {
+ 	clock_setup(SYSCFG_CLOCK_CFG);
+ 	/* Set >RMII mode */
+ 	STM32_SYSCFG->pmc |= SYSCFG_PMC_MII_RMII_SEL;
+-
+-	clock_setup(GPIO_A_CLOCK_CFG);
+-	clock_setup(GPIO_C_CLOCK_CFG);
+-	clock_setup(GPIO_G_CLOCK_CFG);
+ 	clock_setup(STMMAC_CLOCK_CFG);
+ 
+ 	return 0;
+ }
+-#endif
+ 
+-#ifdef CONFIG_STM32_QSPI
+-
+-static int qspi_setup(void)
++int board_early_init_f(void)
+ {
+-	clock_setup(GPIO_B_CLOCK_CFG);
+-	clock_setup(GPIO_D_CLOCK_CFG);
+-	clock_setup(GPIO_E_CLOCK_CFG);
++	stmmac_setup();
++
+ 	return 0;
+ }
+ #endif
+@@ -113,29 +72,6 @@ u32 get_board_rev(void)
+ 	return 0;
+ }
+ 
+-int board_early_init_f(void)
+-{
+-	int res;
+-
+-	res = uart_setup_gpio();
+-	if (res)
+-		return res;
+-
+-#ifdef CONFIG_ETH_DESIGNWARE
+-	res = stmmac_setup();
+-	if (res)
+-		return res;
+-#endif
+-
+-#ifdef CONFIG_STM32_QSPI
+-	res = qspi_setup();
+-	if (res)
+-		return res;
+-#endif
+-
+-	return 0;
+-}
+-
+ int board_init(void)
+ {
+ 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+index 046041a..5e86a76 100644
+--- a/configs/stm32f746-disco_defconfig
++++ b/configs/stm32f746-disco_defconfig
+@@ -24,6 +24,7 @@ CONFIG_CMD_DNS=y
+ CONFIG_CMD_LINK_LOCAL=y
+ CONFIG_CMD_TIMER=y
+ CONFIG_OF_CONTROL=y
++CONFIG_DM_SEQ_ALIAS=y
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_NETCONSOLE=y
+ # CONFIG_MMC is not set
+@@ -45,3 +46,6 @@ CONFIG_PINCTRL=y
+ CONFIG_PINCTRL_STM32=y
+ CONFIG_RAM=y
+ CONFIG_STM32_SDRAM=y
++CONFIG_DM_GPIO=y
++CONFIG_STM32F7_GPIO=y
++CONFIG_SYS_MALLOC_F_LEN=0xC00
+diff --git a/drivers/clk/clk_stm32f7.c b/drivers/clk/clk_stm32f7.c
+index 0d86395..da3c204 100644
+--- a/drivers/clk/clk_stm32f7.c
++++ b/drivers/clk/clk_stm32f7.c
+@@ -228,56 +228,17 @@ static int stm32_clk_enable(struct clk *clk)
+ void clock_setup(int peripheral)
+ {
+ 	switch (peripheral) {
+-	case GPIO_A_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_A_EN);
+-		break;
+-	case GPIO_B_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_B_EN);
+-		break;
+-	case GPIO_C_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_C_EN);
+-		break;
+-	case GPIO_D_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_D_EN);
+-		break;
+-	case GPIO_E_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_E_EN);
+-		break;
+-	case GPIO_F_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_F_EN);
+-		break;
+-	case GPIO_G_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_G_EN);
+-		break;
+-	case GPIO_H_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_H_EN);
+-		break;
+-	case GPIO_I_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_I_EN);
+-		break;
+-	case GPIO_J_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_J_EN);
+-		break;
+-	case GPIO_K_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_GPIO_K_EN);
+-		break;
+ 	case SYSCFG_CLOCK_CFG:
+ 		setbits_le32(&STM32_RCC->apb2enr, RCC_APB2ENR_SYSCFGEN);
+ 		break;
+ 	case TIMER2_CLOCK_CFG:
+ 		setbits_le32(&STM32_RCC->apb1enr, RCC_APB1ENR_TIM2EN);
+ 		break;
+-	case FMC_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb3enr, RCC_AHB3ENR_FMC_EN);
+-		break;
+ 	case STMMAC_CLOCK_CFG:
+ 		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_ETHMAC_EN);
+ 		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_ETHMAC_RX_EN);
+ 		setbits_le32(&STM32_RCC->ahb1enr, RCC_AHB1ENR_ETHMAC_TX_EN);
+ 		break;
+-	case QSPI_CLOCK_CFG:
+-		setbits_le32(&STM32_RCC->ahb3enr, RCC_AHB3ENR_QSPI_EN);
+-		break;
+ 	default:
+ 		break;
+ 	}
+diff --git a/drivers/pinctrl/pinctrl_stm32.c b/drivers/pinctrl/pinctrl_stm32.c
+index e5b6b3b..378fbaf 100644
+--- a/drivers/pinctrl/pinctrl_stm32.c
++++ b/drivers/pinctrl/pinctrl_stm32.c
+@@ -119,11 +119,16 @@ static int stm32_pinctrl_set_state_simple(struct udevice *dev,
+ 		if (len < 0)
+ 			return -EINVAL;
+ 		for (i = 0; i < len; i++) {
++			struct gpio_desc desc;
+ 			debug("%s: pinmux = %x\n", __func__, *(pin_mux + i));
+ 			prep_gpio_dsc(&gpio_dsc, *(pin_mux + i));
+ 			prep_gpio_ctl(&gpio_ctl, *(pin_mux + i), args.node);
+-
+-			rv = stm32_gpio_config(&gpio_dsc, &gpio_ctl);
++			rv = uclass_get_device_by_seq(UCLASS_GPIO,
++						      gpio_dsc.port, &desc.dev);
++			if (rv)
++				return rv;
++			desc.offset = gpio_dsc.pin;
++			rv = stm32_gpio_config(&desc, &gpio_ctl);
+ 			debug("%s: rv = %d\n\n", __func__, rv);
+ 			if (rv)
+ 				return rv;
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index ae3211a..fe3ac34 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -35,7 +35,6 @@
+ #define CONFIG_ENV_IS_NOWHERE
+ #define CONFIG_ENV_SIZE			(8 << 10)
+ 
+-#define CONFIG_STM32_GPIO
+ #define CONFIG_STM32_FLASH
+ #define CONFIG_STM32X7_SERIAL
+ 
+-- 
+1.9.1
+

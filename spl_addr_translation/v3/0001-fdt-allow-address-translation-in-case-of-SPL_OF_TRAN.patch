@@ -1,0 +1,35 @@
+From c6ac0e0fc5925ca19c6b034003d7b43c018c73f1 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Mar 2017 14:50:58 -0700
+Subject: [PATCH v3] fdt: allow address translation in case of SPL_OF_TRANSLATE
+
+Address translation is not working at present even if SPL_OF_TRANSLATE is
+enabled which makes this configuration useless. This patch enables address
+translation for SPL U-Boot when SPL_OF_TRANSLATE is selected.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+Reviewed-by: Simon Glass <sjg@chromium.org>
+---
+
+Changes in v3: changed "u-boot" to "U-Boot" in commit message.
+Changes in v2: Added commit message 
+
+ lib/fdtdec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/fdtdec.c b/lib/fdtdec.c
+index 81f47ef..a1c4d16 100644
+--- a/lib/fdtdec.c
++++ b/lib/fdtdec.c
+@@ -112,7 +112,7 @@ fdt_addr_t fdtdec_get_addr_size_fixed(const void *blob, int node,
+ 		return FDT_ADDR_T_NONE;
+ 	}
+ 
+-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_OF_LIBFDT)
++#if defined(CONFIG_SPL_OF_TRANSLATE) || defined(CONFIG_OF_LIBFDT)
+ 	if (translate)
+ 		addr = fdt_translate_address(blob, node, prop_addr);
+ 	else
+-- 
+1.9.1
+

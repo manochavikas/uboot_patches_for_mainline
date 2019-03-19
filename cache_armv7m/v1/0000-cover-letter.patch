@@ -1,0 +1,24 @@
+From 2019aa483b4db6fd2f092bfa899f741f5d7abcf7 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Thu, 9 Mar 2017 13:46:13 -0800
+Subject: [PATCH 0/2] add armv7m cache support
+
+This patchset adds armv7m instruction/data caches support &
+enable it for stm32f7.
+
+Vikas Manocha (2):
+  armv7m: add instruction & data cache support
+  stm32f7: enable instruction & data cache
+
+ arch/arm/cpu/armv7m/Makefile      |   2 +-
+ arch/arm/cpu/armv7m/cache.c       | 295 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/armv7m.h     |  23 ++-
+ arch/arm/lib/Makefile             |   2 +
+ arch/arm/mach-stm32/stm32f7/soc.c |   2 +
+ include/configs/stm32f746-disco.h |   4 +-
+ 6 files changed, 322 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/cpu/armv7m/cache.c
+
+-- 
+1.9.1
+

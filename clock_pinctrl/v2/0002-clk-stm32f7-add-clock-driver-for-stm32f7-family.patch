@@ -1,0 +1,263 @@
+From 20d998f8203732b921147de365a9d5e322237bf5 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 16 Jan 2017 11:30:23 -0800
+Subject: [PATCH v2 02/10] clk: stm32f7: add clock driver for stm32f7 family
+
+add basic clock driver support for stm32f7 to enable clocks required by
+the peripherals.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2:
+	- added blank lines in code like before return and after
+	  variable declaration.
+	- re-arranged header file inclusion as per u-boot guidelines.
+	- remove not used function.
+
+ arch/arm/mach-stm32/stm32f7/Makefile               |  2 +-
+ arch/arm/mach-stm32/stm32f7/soc.c                  |  2 -
+ configs/stm32f746-disco_defconfig                  |  1 +
+ doc/device-tree-bindings/clock/st,stm32-rcc.txt    | 95 ++++++++++++++++++++++
+ drivers/clk/Makefile                               |  2 +-
+ .../stm32f7/clock.c => drivers/clk/clk_stm32f7.c   | 61 +++++++++++++-
+ 6 files changed, 157 insertions(+), 6 deletions(-)
+ create mode 100644 doc/device-tree-bindings/clock/st,stm32-rcc.txt
+ rename arch/arm/mach-stm32/stm32f7/clock.c => drivers/clk/clk_stm32f7.c (86%)
+
+diff --git a/arch/arm/mach-stm32/stm32f7/Makefile b/arch/arm/mach-stm32/stm32f7/Makefile
+index 643d4d9..03269bd 100644
+--- a/arch/arm/mach-stm32/stm32f7/Makefile
++++ b/arch/arm/mach-stm32/stm32f7/Makefile
+@@ -5,4 +5,4 @@
+ # SPDX-License-Identifier:	GPL-2.0+
+ #
+ 
+-obj-y += timer.o clock.o soc.o
++obj-y += timer.o soc.o
+diff --git a/arch/arm/mach-stm32/stm32f7/soc.c b/arch/arm/mach-stm32/stm32f7/soc.c
+index 8baee99..06af631 100644
+--- a/arch/arm/mach-stm32/stm32f7/soc.c
++++ b/arch/arm/mach-stm32/stm32f7/soc.c
+@@ -17,8 +17,6 @@ u32 get_cpu_rev(void)
+ 
+ int arch_cpu_init(void)
+ {
+-	configure_clocks();
+-
+ 	/*
+ 		* Configure the memory protection unit (MPU)
+ 		* 0x00000000 - 0xffffffff: Strong-order, Shareable
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+index 51b779a..af1449c 100644
+--- a/configs/stm32f746-disco_defconfig
++++ b/configs/stm32f746-disco_defconfig
+@@ -38,3 +38,4 @@ CONFIG_DM_SPI=y
+ CONFIG_STM32_QSPI=y
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ # CONFIG_EFI_LOADER is not set
++CONFIG_CLK=y
+diff --git a/doc/device-tree-bindings/clock/st,stm32-rcc.txt b/doc/device-tree-bindings/clock/st,stm32-rcc.txt
+new file mode 100644
+index 0000000..0532d81
+--- /dev/null
++++ b/doc/device-tree-bindings/clock/st,stm32-rcc.txt
+@@ -0,0 +1,95 @@
++STMicroelectronics STM32 Reset and Clock Controller
++===================================================
++
++The RCC IP is both a reset and a clock controller.
++
++Please refer to clock-bindings.txt for common clock controller binding usage.
++Please also refer to reset.txt for common reset controller binding usage.
++
++Required properties:
++- compatible: Should be:
++  "st,stm32f42xx-rcc"
++  "st,stm32f469-rcc"
++- reg: should be register base and length as documented in the
++  datasheet
++- #reset-cells: 1, see below
++- #clock-cells: 2, device nodes should specify the clock in their "clocks"
++  property, containing a phandle to the clock device node, an index selecting
++  between gated clocks and other clocks and an index specifying the clock to
++  use.
++
++Example:
++
++	rcc: rcc@40023800 {
++		#reset-cells = <1>;
++		#clock-cells = <2>
++		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
++		reg = <0x40023800 0x400>;
++	};
++
++Specifying gated clocks
++=======================
++
++The primary index must be set to 0.
++
++The secondary index is the bit number within the RCC register bank, starting
++from the first RCC clock enable register (RCC_AHB1ENR, address offset 0x30).
++
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register (LSB is 0, MSB is 31).
++
++To simplify the usage and to share bit definition with the reset and clock
++drivers of the RCC IP, macros are available to generate the index in
++human-readble format.
++
++For STM32F4 series, the macro are available here:
++ - include/dt-bindings/mfd/stm32f4-rcc.h
++
++Example:
++
++	/* Gated clock, AHB1 bit 0 (GPIOA) */
++	... {
++		clocks = <&rcc 0 STM32F4_AHB1_CLOCK(GPIOA)>
++	};
++
++	/* Gated clock, AHB2 bit 4 (CRYP) */
++	... {
++		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(CRYP)>
++	};
++
++Specifying other clocks
++=======================
++
++The primary index must be set to 1.
++
++The secondary index is bound with the following magic numbers:
++
++	0	SYSTICK
++	1	FCLK
++
++Example:
++
++	/* Misc clock, FCLK */
++	... {
++		clocks = <&rcc 1 STM32F4_APB1_CLOCK(TIM2)>
++	};
++
++
++Specifying softreset control of devices
++=======================================
++
++Device nodes should specify the reset channel required in their "resets"
++property, containing a phandle to the reset device node and an index specifying
++which channel to use.
++The index is the bit number within the RCC registers bank, starting from RCC
++base address.
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register.
++For example, for CRC reset:
++  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
++
++example:
++
++	timer2 {
++		resets	= <&rcc STM32F4_APB1_RESET(TIM2)>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 884c21c..1ed29c7 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -17,5 +17,5 @@ obj-$(CONFIG_CLK_UNIPHIER) += uniphier/
+ obj-$(CONFIG_CLK_EXYNOS) += exynos/
+ obj-$(CONFIG_CLK_AT91) += at91/
+ obj-$(CONFIG_CLK_BOSTON) += clk_boston.o
+-
+ obj-$(CONFIG_ARCH_ASPEED) += aspeed/
++obj-$(CONFIG_STM32F7) += clk_stm32f7.o
+diff --git a/arch/arm/mach-stm32/stm32f7/clock.c b/drivers/clk/clk_stm32f7.c
+similarity index 86%
+rename from arch/arm/mach-stm32/stm32f7/clock.c
+rename to drivers/clk/clk_stm32f7.c
+index e1ee173..4c5388a 100644
+--- a/arch/arm/mach-stm32/stm32f7/clock.c
++++ b/drivers/clk/clk_stm32f7.c
+@@ -1,11 +1,12 @@
+ /*
+- * (C) Copyright 2016
++ * (C) Copyright 2017
+  * Vikas Manocha, <vikas.manocha@st.com>
+  *
+  * SPDX-License-Identifier:	GPL-2.0+
+  */
+-
+ #include <common.h>
++#include <clk-uclass.h>
++#include <dm.h>
+ #include <asm/io.h>
+ #include <asm/arch/rcc.h>
+ #include <asm/arch/stm32.h>
+@@ -212,6 +213,17 @@ unsigned long clock_get(enum clock clck)
+ 	}
+ }
+ 
++static int stm32_clk_enable(struct clk *clk)
++{
++	u32 offset = clk->id / 32;
++	u32 bit_index = clk->id % 32;
++
++	debug("%s: clkid = %ld, offset from AHB1ENR is %d, bit_index = %d\n",
++	      __func__, clk->id, offset, bit_index);
++	setbits_le32(&STM32_RCC->ahb1enr + offset, BIT(bit_index));
++
++	return 0;
++}
+ 
+ void clock_setup(int peripheral)
+ {
+@@ -273,3 +285,48 @@ void clock_setup(int peripheral)
+ 		break;
+ 	}
+ }
++
++static int stm32_clk_probe(struct udevice *dev)
++{
++	debug("%s: stm32_clk_probe\n", __func__);
++	configure_clocks();
++
++	return 0;
++}
++
++static int stm32_clk_of_xlate(struct clk *clk,
++			struct fdtdec_phandle_args *args)
++{
++	debug("%s(clk=%p)\n", __func__, clk);
++
++	if (args->args_count != 2) {
++		debug("Invaild args_count: %d\n", args->args_count);
++		return -EINVAL;
++	}
++
++	if (args->args_count)
++		clk->id = args->args[1];
++	else
++		clk->id = 0;
++
++	return 0;
++}
++
++static struct clk_ops stm32_clk_ops = {
++	.of_xlate	= stm32_clk_of_xlate,
++	.enable		= stm32_clk_enable,
++};
++
++static const struct udevice_id stm32_clk_ids[] = {
++	{ .compatible = "st,stm32f42xx-rcc"},
++	{}
++};
++
++U_BOOT_DRIVER(stm32f7_clk) = {
++	.name		= "stm32f7_clk",
++	.id		= UCLASS_CLK,
++	.of_match	= stm32_clk_ids,
++	.ops		= &stm32_clk_ops,
++	.probe		= stm32_clk_probe,
++	.flags		= DM_FLAG_PRE_RELOC,
++};
+-- 
+1.9.1
+

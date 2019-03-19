@@ -1,0 +1,42 @@
+From 915fe1e99e08d0eaa38b20ea11949224f491cfd9 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Mon, 27 Mar 2017 12:50:21 -0700
+Subject: [PATCH v4 0/2] add armv7m cache support
+
+This patchset adds armv7m instruction/data caches support &
+enable it for stm32f7.
+
+Changed in v4:
+- invalidate_dcache_range() & flush_dcache_range() function added.
+- blank lines added.
+- comments added for registers, functions & barriers.
+- register names changed for better clarity.
+- typecasting moved to macro definitions.
+
+Changed in v3:
+- uint32 replcaed with u32.
+- multiple read of hardware register replaced with single.
+- pointers replaced with macros for base address.
+- register names added as comment for system control block registers.
+
+Changed in v2:
+- changed strucures for memory mapped cache registers to macros
+- added lines better readability.
+- replaced magic numbers with macros.
+
+Vikas Manocha (2):
+  armv7m: add instruction & data cache support
+  stm32f7: enable instruction & data cache
+
+ arch/arm/cpu/armv7m/Makefile      |   3 +-
+ arch/arm/cpu/armv7m/cache.c       | 336 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/armv7m.h     |  26 ++-
+ arch/arm/lib/Makefile             |   2 +
+ arch/arm/mach-stm32/stm32f7/soc.c |   2 +
+ include/configs/stm32f746-disco.h |   4 +-
+ 6 files changed, 366 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/cpu/armv7m/cache.c
+
+-- 
+1.9.1
+

@@ -1,0 +1,28 @@
+From b2ad4962488d5b67ae31c47bb25ba258ed72a5dd Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 31 Aug 2018 15:46:38 -0700
+Subject: [PATCH] arm: stm32: Remove redundant thumb build selection
+
+All armv7m arch builds are thumb & SYS_THUMB_BUILD is already selected by
+CPU_ARMV7M.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8a23c76..b711605 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1266,7 +1266,6 @@ config STM32
+ 	select CPU_V7M
+ 	select DM
+ 	select DM_SERIAL
+-	select SYS_THUMB_BUILD
+ 	imply CMD_DM
+ 
+ config ARCH_STI
+-- 
+2.7.4
+

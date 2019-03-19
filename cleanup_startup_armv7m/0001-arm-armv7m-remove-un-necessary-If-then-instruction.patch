@@ -1,0 +1,30 @@
+From 0fba4ea10beae4fa4046451f7e5f27074d42e1ac Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 27 Jun 2017 11:13:35 -0700
+Subject: [PATCH] arm: armv7m: remove un-necessary If then instruction
+
+With gas option -mimplicit-it=always, IT block is inserted by the assembler
+for thumb2.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/lib/crt0.S | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/lib/crt0.S b/arch/arm/lib/crt0.S
+index 0decce2..d7ff9f0 100644
+--- a/arch/arm/lib/crt0.S
++++ b/arch/arm/lib/crt0.S
+@@ -139,9 +139,6 @@ here:
+ 	mov	r2, #0x00000000		/* prepare zero to clear BSS */
+ 
+ clbss_l:cmp	r0, r1			/* while not at end of BSS */
+-#if defined(CONFIG_CPU_V7M)
+-	itt	lo
+-#endif
+ 	strlo	r2, [r0]		/* clear 32-bit BSS word */
+ 	addlo	r0, r0, #4		/* move to next */
+ 	blo	clbss_l
+-- 
+2.7.4
+

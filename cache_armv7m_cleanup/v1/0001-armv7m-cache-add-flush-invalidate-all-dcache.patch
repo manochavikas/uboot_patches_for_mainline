@@ -1,0 +1,42 @@
+From ed6fd6679c6ca328d694d8a39c8e9efc01c29932 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Tue, 2 May 2017 10:18:17 -0700
+Subject: [PATCH 1/2] armv7m: cache: add flush & invalidate all dcache
+
+Add functionality to flush & invalidate all the dcache using the
+prototype declared in common header file.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+ arch/arm/cpu/armv7m/cache.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/cpu/armv7m/cache.c b/arch/arm/cpu/armv7m/cache.c
+index 162cfe3..84f658d 100644
+--- a/arch/arm/cpu/armv7m/cache.c
++++ b/arch/arm/cpu/armv7m/cache.c
+@@ -253,6 +253,21 @@ void flush_dcache_range(unsigned long start, unsigned long stop)
+ 		return;
+ 	}
+ }
++void flush_dcache_all(void)
++{
++	if (action_dcache_all(FLUSH_SET_WAY)) {
++		printf("ERR: D-cache not flushed\n");
++		return;
++	}
++}
++
++void invalidate_dcache_all(void)
++{
++	if (action_dcache_all(INVALIDATE_SET_WAY)) {
++		printf("ERR: D-cache not invalidated\n");
++		return;
++	}
++}
+ #else
+ void dcache_enable(void)
+ {
+-- 
+1.9.1
+

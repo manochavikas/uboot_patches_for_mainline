@@ -1,0 +1,80 @@
+From c41e1573371a78c89993e7ac8f4594f87fb40db1 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Wed, 8 Feb 2017 09:16:52 -0800
+Subject: [PATCH v2 06/18] stm32f7: use clock driver to enable sdram controller
+ clock
+
+This patch also removes the sdram/fmc clock enable from board specific
+code.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+Changed in v2: None
+
+ arch/arm/dts/stm32f746.dtsi                |  1 +
+ board/st/stm32f746-disco/stm32f746-disco.c |  2 --
+ drivers/ram/stm32_sdram.c                  | 15 +++++++++++++++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/dts/stm32f746.dtsi b/arch/arm/dts/stm32f746.dtsi
+index 3707550..e9fd6f4 100644
+--- a/arch/arm/dts/stm32f746.dtsi
++++ b/arch/arm/dts/stm32f746.dtsi
+@@ -74,6 +74,7 @@
+ 		fmc: fmc@A0000000 {
+ 			compatible = "st,stm32-fmc";
+ 			reg = <0xA0000000 0x1000>;
++			clocks = <&rcc 0 64>;
+ 			u-boot,dm-pre-reloc;
+ 		};
+ 
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index e1113a6..370db15 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -51,8 +51,6 @@ int dram_init(void)
+ 	if (rv)
+ 		return rv;
+ 
+-	clock_setup(FMC_CLOCK_CFG);
+-
+ 	rv = uclass_get_device(UCLASS_RAM, 0, &dev);
+ 	if (rv) {
+ 		debug("DRAM init failed: %d\n", rv);
+diff --git a/drivers/ram/stm32_sdram.c b/drivers/ram/stm32_sdram.c
+index 67be61f..67d8855 100644
+--- a/drivers/ram/stm32_sdram.c
++++ b/drivers/ram/stm32_sdram.c
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <common.h>
++#include <clk.h>
+ #include <dm.h>
+ #include <ram.h>
+ #include <asm/io.h>
+@@ -122,6 +123,20 @@ int stm32_sdram_init(void)
+ 
+ static int stm32_fmc_probe(struct udevice *dev)
+ {
++#ifdef CONFIG_CLK
++	int ret;
++	struct clk clk;
++	ret = clk_get_by_index(dev, 0, &clk);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_enable(&clk);
++
++	if (ret) {
++		dev_err(dev, "failed to enable clock\n");
++		return ret;
++	}
++#endif
+ 	stm32_sdram_init();
+ 	return 0;
+ }
+-- 
+1.9.1
+

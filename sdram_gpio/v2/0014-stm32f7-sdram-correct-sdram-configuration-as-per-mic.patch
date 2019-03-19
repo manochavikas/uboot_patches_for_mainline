@@ -1,0 +1,217 @@
+From 9b6c9078aff0c6627cda32581605c14137802439 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 24 Feb 2017 10:09:01 -0800
+Subject: [PATCH v2 14/18] stm32f7: sdram: correct sdram configuration as per
+ micron sdram
+
+Actually the sdram memory on stm32f746 discovery board is micron part
+MT48LC_4M32_B2B5_6A. This patch does the modification required in the
+device tree node & driver for the same.
+
+Also we are passing here all the timing parameters in terms of clock
+cycles, so no need to convert time(ns or ms) to cycles.
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+cc: Christophe KERELLO <christophe.kerello@st.com>
+---
+Changed in v2: None
+
+ arch/arm/dts/stm32f746-disco.dts         | 13 +++++---
+ drivers/ram/stm32_sdram.c                | 55 ++++++++++----------------------
+ include/configs/stm32f746-disco.h        |  1 -
+ include/dt-bindings/memory/stm32-sdram.h | 15 +++++----
+ 4 files changed, 33 insertions(+), 51 deletions(-)
+
+diff --git a/arch/arm/dts/stm32f746-disco.dts b/arch/arm/dts/stm32f746-disco.dts
+index 8e4576b..e720ff1 100644
+--- a/arch/arm/dts/stm32f746-disco.dts
++++ b/arch/arm/dts/stm32f746-disco.dts
+@@ -106,12 +106,15 @@
+ 	status = "okay";
+ 
+ 	mr-nbanks = <1>;
+-	/* sdram memory configuration from sdram datasheet IS42S16400J */
++	/* Memory configuration from sdram datasheet MT48LC_4M32_B2B5-6A */
+ 	bank1: bank@0 {
+-	       st,sdram-control = /bits/ 8 <NO_COL_8 NO_ROW_12 MWIDTH_16 BANKS_2
+-	       				    CAS_3 RD_BURST_EN RD_PIPE_DL_0>;
+-	       st,sdram-timing = /bits/ 8 <TMRD_1 TXSR_60 TRAS_42 TRC_60 TRP_18
+-	       				   TRCD_18>;
++	       st,sdram-control = /bits/ 8 <NO_COL_8 NO_ROW_12 MWIDTH_16 BANKS_4
++	       				    CAS_3 SDCLK_2 RD_BURST_EN
++					    RD_PIPE_DL_0>;
++	       st,sdram-timing = /bits/ 8 <TMRD_2 TXSR_6 TRAS_4 TRC_6 TWR_2
++	       				   TRP_2 TRCD_2>;
++		/* refcount = (64msec/total_row_sdram)*freq - 20 */
++	       st,sdram-refcount = < 1542 >;
+        };
+ };
+ 
+diff --git a/drivers/ram/stm32_sdram.c b/drivers/ram/stm32_sdram.c
+index 5e09f35..48b4979 100644
+--- a/drivers/ram/stm32_sdram.c
++++ b/drivers/ram/stm32_sdram.c
+@@ -21,6 +21,7 @@ struct stm32_sdram_control {
+ 	u8 memory_width;
+ 	u8 no_banks;
+ 	u8 cas_latency;
++	u8 sdclk;
+ 	u8 rd_burst;
+ 	u8 rd_pipe_delay;
+ };
+@@ -31,51 +32,25 @@ struct stm32_sdram_timing {
+ 	u8 tras;
+ 	u8 trc;
+ 	u8 trp;
++	u8 twr;
+ 	u8 trcd;
+ };
+ struct stm32_sdram_params {
+ 	u8 no_sdram_banks;
+ 	struct stm32_sdram_control sdram_control;
+ 	struct stm32_sdram_timing sdram_timing;
++	u32 sdram_ref_count;
+ };
+-static inline u32 _ns2clk(u32 ns, u32 freq)
+-{
+-	u32 tmp = freq/1000000;
+-	return (tmp * ns) / 1000;
+-}
+-
+-#define NS2CLK(ns) (_ns2clk(ns, freq))
+-
+-#define SDRAM_TREF	(NS2CLK(64000000 / 8192) - 20)
+ 
+ #define SDRAM_MODE_BL_SHIFT	0
+ #define SDRAM_MODE_CAS_SHIFT	4
+ #define SDRAM_MODE_BL		0
+-#define SDRAM_MODE_CAS		3
+-
+-#define SDRAM_TRDL	12
+ 
+ int stm32_sdram_init(struct udevice *dev)
+ {
+-	u32 freq;
+-	u32 sdram_twr;
+ 	struct stm32_sdram_params *params = dev_get_platdata(dev);
+ 
+-	/*
+-	 * Get frequency for NS2CLK calculation.
+-	 */
+-	freq = clock_get(CLOCK_AHB) / CONFIG_SYS_RAM_FREQ_DIV;
+-	debug("%s, sdram freq = %d\n", __func__, freq);
+-
+-	/* Last data in to row precharge, need also comply ineq on page 1648 */
+-	sdram_twr = max(
+-			max(SDRAM_TRDL, params->sdram_timing.tras
+-			    - params->sdram_timing.trcd),
+-			params->sdram_timing.trc - params->sdram_timing.trcd
+-			- params->sdram_timing.trp
+-		       );
+-
+-	writel(CONFIG_SYS_RAM_FREQ_DIV << FMC_SDCR_SDCLK_SHIFT
++	writel(params->sdram_control.sdclk << FMC_SDCR_SDCLK_SHIFT
+ 		| params->sdram_control.cas_latency << FMC_SDCR_CAS_SHIFT
+ 		| params->sdram_control.no_banks << FMC_SDCR_NB_SHIFT
+ 		| params->sdram_control.memory_width << FMC_SDCR_MWID_SHIFT
+@@ -85,13 +60,13 @@ int stm32_sdram_init(struct udevice *dev)
+ 		| params->sdram_control.rd_burst << FMC_SDCR_RBURST_SHIFT,
+ 		&STM32_SDRAM_FMC->sdcr1);
+ 
+-	writel(NS2CLK(params->sdram_timing.trcd) << FMC_SDTR_TRCD_SHIFT
+-		| NS2CLK(params->sdram_timing.trp) << FMC_SDTR_TRP_SHIFT
+-		| NS2CLK(sdram_twr) << FMC_SDTR_TWR_SHIFT
+-		| NS2CLK(params->sdram_timing.trc) << FMC_SDTR_TRC_SHIFT
+-		| NS2CLK(params->sdram_timing.tras) << FMC_SDTR_TRAS_SHIFT
+-		| NS2CLK(params->sdram_timing.txsr) << FMC_SDTR_TXSR_SHIFT
+-		| NS2CLK(params->sdram_timing.tmrd) << FMC_SDTR_TMRD_SHIFT,
++	writel(params->sdram_timing.trcd << FMC_SDTR_TRCD_SHIFT
++		| params->sdram_timing.trp << FMC_SDTR_TRP_SHIFT
++		| params->sdram_timing.twr << FMC_SDTR_TWR_SHIFT
++		| params->sdram_timing.trc << FMC_SDTR_TRC_SHIFT
++		| params->sdram_timing.tras << FMC_SDTR_TRAS_SHIFT
++		| params->sdram_timing.txsr << FMC_SDTR_TXSR_SHIFT
++		| params->sdram_timing.tmrd << FMC_SDTR_TMRD_SHIFT,
+ 		&STM32_SDRAM_FMC->sdtr1);
+ 
+ 	writel(FMC_SDCMR_BANK_1 | FMC_SDCMR_MODE_START_CLOCK,
+@@ -110,7 +85,7 @@ int stm32_sdram_init(struct udevice *dev)
+ 	FMC_BUSY_WAIT();
+ 
+ 	writel(FMC_SDCMR_BANK_1 | (SDRAM_MODE_BL << SDRAM_MODE_BL_SHIFT
+-	       | SDRAM_MODE_CAS << SDRAM_MODE_CAS_SHIFT)
++	       | params->sdram_control.cas_latency << SDRAM_MODE_CAS_SHIFT)
+ 	       << FMC_SDCMR_MODE_REGISTER_SHIFT | FMC_SDCMR_MODE_WRITE_MODE,
+ 	       &STM32_SDRAM_FMC->sdcmr);
+ 	udelay(100);
+@@ -121,7 +96,7 @@ int stm32_sdram_init(struct udevice *dev)
+ 	FMC_BUSY_WAIT();
+ 
+ 	/* Refresh timer */
+-	writel(SDRAM_TREF, &STM32_SDRAM_FMC->sdrtr);
++	writel((params->sdram_ref_count) << 1, &STM32_SDRAM_FMC->sdrtr);
+ 
+ 	return 0;
+ }
+@@ -142,12 +117,14 @@ static int stm32_fmc_ofdata_to_platdata(struct udevice *dev)
+ 					    sizeof(params->sdram_control));
+ 		if (ret)
+ 			return ret;
+-
+ 		ret = fdtdec_get_byte_array(blob, node, "st,sdram-timing",
+ 					    (u8 *)&params->sdram_timing,
+ 					    sizeof(params->sdram_timing));
+ 		if (ret)
+ 			return ret;
++
++		params->sdram_ref_count = fdtdec_get_int(blob, node,
++						"st,sdram-refcount", 8196);
+ 	}
+ 
+ 	return 0;
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index b6ad8d2..213bdcc 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -21,7 +21,6 @@
+  * Configuration of the external SDRAM memory
+  */
+ #define CONFIG_NR_DRAM_BANKS		1
+-#define CONFIG_SYS_RAM_FREQ_DIV         2
+ #define CONFIG_SYS_LOAD_ADDR		0xC0400000
+ #define CONFIG_LOADADDR			0xC0400000
+ 
+diff --git a/include/dt-bindings/memory/stm32-sdram.h b/include/dt-bindings/memory/stm32-sdram.h
+index 4cd6c2b..89b719a 100644
+--- a/include/dt-bindings/memory/stm32-sdram.h
++++ b/include/dt-bindings/memory/stm32-sdram.h
+@@ -18,17 +18,20 @@
+ #define CAS_1		0x1
+ #define CAS_2		0x2
+ #define CAS_3		0x3
++#define SDCLK_2		0x2
+ #define RD_BURST_EN	0x1
+ #define RD_BURST_DIS	0x0
+ #define RD_PIPE_DL_0	0x0
+ #define RD_PIPE_DL_1	0x1
+ #define RD_PIPE_DL_2	0x2
+ 
+-#define TMRD_1		0x1
+-#define TXSR_60		60
+-#define TRAS_42		42
+-#define TRC_60		60
+-#define TRP_18		18
+-#define TRCD_18		18
++/* Timing = value +1 cycles */
++#define TMRD_2		(2 - 1)
++#define TXSR_6		(6 - 1)
++#define TRAS_4		(4 - 1)
++#define TRC_6		(6 - 1)
++#define TWR_2		(2 - 1)
++#define TRP_2		(2 - 1)
++#define TRCD_2		(2 - 1)
+ 
+ #endif
+-- 
+1.9.1
+

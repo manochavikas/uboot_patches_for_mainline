@@ -1,0 +1,73 @@
+From 8f220519382ca460a6d021b90620e1a8aeb22656 Mon Sep 17 00:00:00 2001
+From: Vikas Manocha <vikas.manocha@st.com>
+Date: Fri, 7 Apr 2017 10:37:43 -0700
+Subject: [PATCH v2 6/7] spl: stm32f7: add kernel boot support
+Cc: patrick.delaunay@st.com,
+    patrice.chotard@st.com,
+    christophe.kerello@st.com,
+    christophe.priouzeau@st.com,
+    alexandre.torgue@st.com
+
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+---
+
+Changed in v2: None
+
+ arch/arm/mach-stm32/stm32f7/Kconfig        | 1 +
+ board/st/stm32f746-disco/stm32f746-disco.c | 9 +++++++++
+ include/configs/stm32f746-disco.h          | 7 +++++++
+ 3 files changed, 17 insertions(+)
+
+diff --git a/arch/arm/mach-stm32/stm32f7/Kconfig b/arch/arm/mach-stm32/stm32f7/Kconfig
+index c13fafa..3f6455e 100644
+--- a/arch/arm/mach-stm32/stm32f7/Kconfig
++++ b/arch/arm/mach-stm32/stm32f7/Kconfig
+@@ -21,6 +21,7 @@ config SUPPORT_SPL
+ 	select SPL_RAM
+ 	select SPL_DM_SEQ_ALIAS
+ 	select SPL_OF_TRANSLATE
++	select SPL_OS_BOOT
+ 
+ config SPL_PINCTRL_FULL
+ 	default n if TARGET_STM32F746_DISCO
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index 4f2b677..335dcb9 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -91,6 +91,15 @@ int board_early_init_f(void)
+ #endif
+ 
+ #ifdef CONFIG_SPL_BUILD
++#ifdef CONFIG_SPL_OS_BOOT
++int spl_start_uboot(void)
++{
++	debug("SPL: booting kernel\n");
++	/* break into full u-boot on 'c' */
++	return serial_tstc() && serial_getc() == 'c';
++}
++#endif
++
+ int spl_dram_init(void)
+ {
+ 	struct udevice *dev;
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 055fdf8..9052025 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -86,6 +86,13 @@
+ #define CONFIG_SYS_UBOOT_START		0XC00003FD
+ #define CONFIG_SYS_UBOOT_BASE		(CONFIG_SYS_FLASH_BASE + \
+ 					 CONFIG_SYS_SPL_LEN)
++
++#define CONFIG_SYS_OS_BASE		0x08040000
++/* DT blob (fdt) address */
++#define CONFIG_SYS_SPL_ARGS_ADDR        0xC0000100
++#define CONFIG_SYS_FDT_BASE		(CONFIG_SYS_FLASH_BASE + \
++					0x1C0000)
++#define CONFIG_SYS_FDT_SIZE		(20*1024)
+ #endif
+ /* For SPL ends */
+ 
+-- 
+1.9.1
+
